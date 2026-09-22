@@ -1,0 +1,214 @@
+(() => {
+  'use strict';
+
+  // Isi dengan nomor WhatsApp Sales dalam format internasional, misalnya 62812….
+  // Biarkan kosong untuk memilih sendiri kontak tujuan di WhatsApp.
+  const WHATSAPP_NUMBER = '';
+
+  const THEME_STORAGE_KEY = 'sbg-theme';
+  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+  let themePreference = null;
+
+  const validTheme = (value) => value === 'dark' || value === 'light';
+
+  try {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
+    if (validTheme(savedTheme)) themePreference = savedTheme;
+  } catch {
+    // Tema tetap bisa diubah saat penyimpanan browser tidak tersedia.
+  }
+
+  const applyTheme = () => {
+    const theme = themePreference || (systemTheme.matches ? 'dark' : 'light');
+    document.documentElement.dataset.theme = theme;
+
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = theme === 'dark' ? '#111b16' : '#f7f7f0';
+
+    const toggle = document.querySelector('.theme-toggle');
+    if (toggle) {
+      toggle.setAttribute('aria-pressed', String(theme === 'dark'));
+      toggle.title = theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap';
+      toggle.hidden = false;
+    }
+  };
+
+  // Berjalan di <head> sebelum stylesheet untuk menghindari kilatan tema berbeda.
+  applyTheme();
+
+  const followSystemTheme = () => {
+    if (!themePreference) applyTheme();
+  };
+  if (typeof systemTheme.addEventListener === 'function') {
+    systemTheme.addEventListener('change', followSystemTheme);
+  } else {
+    systemTheme.addListener(followSystemTheme);
+  }
+
+  window.addEventListener('storage', (event) => {
+    if (event.key !== THEME_STORAGE_KEY && event.key !== null) return;
+    themePreference = validTheme(event.newValue) ? event.newValue : null;
+    applyTheme();
+  });
+
+  const initializeWelcome = () => {
+    document.documentElement.classList.add('js-enabled');
+
+    const themeToggle = document.querySelector('.theme-toggle');
+    if (themeToggle) {
+      themeToggle.addEventListener('click', () => {
+        themePreference = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        try {
+          window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
+        } catch {
+          // Pilihan tetap berlaku pada halaman ini jika penyimpanan diblokir.
+        }
+        applyTheme();
+      });
+    }
+    applyTheme();
+
+    const menuToggle = document.querySelector('.menu-toggle');
+    const mainNav = document.querySelector('#main-nav');
+
+    if (menuToggle && mainNav) {
+      const desktopLayout = window.matchMedia('(min-width: 901px)');
+
+      const setMenuOpen = (isOpen, restoreFocus = false) => {
+        mainNav.classList.toggle('is-open', isOpen);
+        document.body.classList.toggle('menu-open', isOpen);
+        menuToggle.setAttribute('aria-expanded', String(isOpen));
+        menuToggle.setAttribute('aria-label', isOpen ? 'Tutup menu' : 'Buka menu');
+
+        if (restoreFocus) menuToggle.focus();
+      };
+
+      menuToggle.addEventListener('click', () => {
+        if (desktopLayout.matches) return;
+        setMenuOpen(menuToggle.getAttribute('aria-expanded') !== 'true');
+      });
+
+      mainNav.addEventListener('click', (event) => {
+        if (event.target.closest('a[href]')) setMenuOpen(false);
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && menuToggle.getAttribute('aria-expanded') === 'true') {
+          setMenuOpen(false, true);
+        }
+      });
+
+      document.addEventListener('click', (event) => {
+        if (!menuToggle.contains(event.target) && !mainNav.contains(event.target)) {
+          setMenuOpen(false);
+        }
+      });
+
+      const resetMenuForLayout = () => setMenuOpen(false);
+      if (typeof desktopLayout.addEventListener === 'function') {
+        desktopLayout.addEventListener('change', resetMenuForLayout);
+      } else {
+        desktopLayout.addListener(resetMenuForLayout);
+      }
+      resetMenuForLayout();
+    }
+
+    const filters = document.querySelectorAll('[data-filter]');
+    const products = document.querySelectorAll('.product-card[data-category]');
+
+    filters.forEach((filter) => {
+      filter.addEventListener('click', () => {
+        const category = filter.dataset.filter;
+
+        filters.forEach((button) => {
+          const active = button === filter;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+
+        products.forEach((product) => {
+          product.hidden = category !== 'all' && product.dataset.category !== category;
+        });
+      });
+    });
+
+    const productField = document.querySelector('#product');
+    if (productField) {
+      document.querySelectorAll('a[data-product]').forEach((link) => {
+        link.addEventListener('click', () => {
+          productField.value = link.dataset.product || '';
+        });
+      });
+    }
+
+    const year = document.querySelector('#year');
+    if (year) year.textContent = String(new Date().getFullYear());
+
+    const form = document.querySelector('#quote-form');
+    if (!form) return;
+
+    const nameField = form.querySelector('[name="name"]');
+    const note = document.querySelector('#whatsapp-note');
+    const status = document.querySelector('#form-status');
+    const whatsappNumber = WHATSAPP_NUMBER.replace(/\D/g, '');
+
+    if (note) {
+      note.textContent = whatsappNumber
+        ? 'Pesan akan disiapkan untuk WhatsApp Sales. Periksa pesan sebelum mengirim.'
+        : 'Nomor Sales belum diatur. WhatsApp akan meminta Anda memilih kontak tujuan.';
+    }
+
+    if (nameField) {
+      nameField.addEventListener('input', () => nameField.setCustomValidity(''));
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      if (nameField) {
+        nameField.value = nameField.value.trim();
+        nameField.setCustomValidity(nameField.value ? '' : 'Masukkan nama atau perusahaan Anda.');
+      }
+
+      if (!form.reportValidity()) return;
+
+      const valueOf = (name) => {
+        const field = form.querySelector(`[name="${name}"]`);
+        return field ? field.value.trim() : '';
+      };
+
+      const message = [
+        'Halo tim Sales Sentra Buah Garut, saya ingin meminta penawaran buah.',
+        '',
+        `Nama / perusahaan: ${valueOf('name')}`,
+        `Segmen usaha: ${valueOf('segment')}`,
+      ];
+
+      const product = valueOf('product');
+      const volume = valueOf('volume');
+      if (product) message.push(`Kebutuhan buah: ${product}`);
+      if (volume) message.push(`Estimasi volume & jadwal: ${volume}`);
+
+      const whatsappUrl = new URL(`https://wa.me/${whatsappNumber}`);
+      whatsappUrl.searchParams.set('text', message.join('\n'));
+
+      if (status) {
+        const link = document.createElement('a');
+        link.href = whatsappUrl.href;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Buka pesan di WhatsApp';
+        status.replaceChildren('Pesan siap. Jika WhatsApp belum terbuka, ', link, '.');
+        status.hidden = false;
+      }
+
+      window.open(whatsappUrl.href, '_blank', 'noopener,noreferrer');
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeWelcome, { once: true });
+  } else {
+    initializeWelcome();
+  }
+})();

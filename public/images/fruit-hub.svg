@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="800" y1="0" x2="800" y2="1000" gradientUnits="userSpaceOnUse"><stop stop-color="#839476"/><stop offset=".55" stop-color="#c1c2a0"/><stop offset="1" stop-color="#718361"/></linearGradient>
+    <linearGradient id="floor" x1="800" y1="510" x2="800" y2="1000" gradientUnits="userSpaceOnUse"><stop stop-color="#71764c"/><stop offset="1" stop-color="#253b2a"/></linearGradient>
+    <linearGradient id="wood" x1="0" y1="0" x2="0" y2="160" gradientUnits="userSpaceOnUse"><stop stop-color="#b78c53"/><stop offset="1" stop-color="#8e653a"/></linearGradient>
+    <radialGradient id="orange" cx=".32" cy=".28" r=".75"><stop stop-color="#ffd470"/><stop offset=".5" stop-color="#f2a227"/><stop offset="1" stop-color="#ce7018"/></radialGradient>
+    <radialGradient id="apple" cx=".3" cy=".25" r=".8"><stop stop-color="#f2946c"/><stop offset=".6" stop-color="#c95735"/><stop offset="1" stop-color="#913e2f"/></radialGradient>
+    <radialGradient id="pear" cx=".35" cy=".25" r=".8"><stop stop-color="#ebdf9a"/><stop offset=".65" stop-color="#b1bb5c"/><stop offset="1" stop-color="#849448"/></radialGradient>
+    <symbol id="citrus" viewBox="0 0 110 120"><circle cx="53" cy="68" r="47" fill="url(#orange)"/><path d="M53 22c8-24 33-23 42-11-13 14-30 16-42 11Z" fill="#4b7041"/><path d="M53 27v-14" stroke="#6d6737" stroke-width="4" stroke-linecap="round"/><path d="M28 44c-6 5-9 13-9 21" stroke="#ffe39a" stroke-opacity=".45" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="red-fruit" viewBox="0 0 110 120"><path d="M55 27C26 11 3 36 7 67c4 35 26 55 47 42 22 12 45-7 48-40 4-34-18-56-47-42Z" fill="url(#apple)"/><path d="M54 29c-1-11 2-19 8-24" stroke="#645233" stroke-width="5" stroke-linecap="round"/><path d="M57 19C66 0 85 2 96 10 84 25 69 28 57 19Z" fill="#72904d"/><path d="M27 41c-7 7-10 14-9 25" stroke="#f6b591" stroke-opacity=".5" stroke-width="3" stroke-linecap="round"/></symbol>
+    <symbol id="green-fruit" viewBox="0 0 100 135"><path d="M48 18c24 0 20 29 31 45 29 44 9 70-31 70S-10 105 17 65C29 45 25 18 48 18Z" fill="url(#pear)"/><path d="M49 20c-2-10 0-14 5-18" stroke="#655e38" stroke-width="5" stroke-linecap="round"/><path d="M55 14C61 1 78 1 85 10 75 20 64 23 55 14Z" fill="#5a7642"/></symbol>
+    <symbol id="crate" viewBox="0 0 400 180"><path d="M0 0h400v164H0Z" fill="#624c2e"/><path d="M0 0h400v39H0Zm0 55h400v40H0Zm0 55h400v44H0Z" fill="url(#wood)"/><path d="M16 0h24v168H16ZM360 0h24v168h-24Z" fill="#c29a62"/><path d="M52 19h293M51 76h295M52 133h293" stroke="#d3ad70" stroke-opacity=".25" stroke-width="2"/><g fill="#60492d"><circle cx="28" cy="18" r="3"/><circle cx="28" cy="136" r="3"/><circle cx="372" cy="18" r="3"/><circle cx="372" cy="136" r="3"/></g><path d="M150 63h100v30H150Z" fill="#e8dfb8" fill-opacity=".55"/><path d="M169 77h62" stroke="#586141" stroke-width="3"/></symbol>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1600v1000H0z"/>
+  <circle cx="1240" cy="186" r="115" fill="#ece1b3" fill-opacity=".25"/>
+  <path d="m0 433 217-203 147 117L581 123l203 254L961 220l177 112 167-207 295 298v260H0Z" fill="#76876e"/>
+  <path d="m0 500 281-170 176 147 241-219 194 232 241-171 138 95 144-78 185 159v205H0Z" fill="#536d54"/>
+  <path d="M0 566c200-145 342-40 545-54 262-19 382-105 570-66 243 49 278-6 485-36v329H0Z" fill="#3b5740"/>
+  <path d="M0 620c437-72 822-72 1600-66v446H0Z" fill="url(#floor)"/>
+  <path d="m684 633 153 367m210-367 43 367m221-367-55 367M633 752h967M638 878h962" stroke="#a0a078" stroke-opacity=".15" stroke-width="2"/>
+  <path d="M0 0h1600v67H0Z" fill="#213e2d"/><path d="m0 69 1600 124v26L0 94Z" fill="#2d4730"/>
+  <path d="M726 0h31v615h-31Zm804 0h34v705h-34Z" fill="#304b35"/>
+  <path d="m743 87 256 79-5 18-251-76Z" fill="#2c4730"/>
+  <ellipse cx="1181" cy="873" rx="411" ry="85" fill="#152d1f" fill-opacity=".4"/>
+  <g transform="translate(1130 400) rotate(3)">
+    <path d="M0 68h374l-25-58H33Z" fill="#655235"/>
+    <use href="#green-fruit" x="19" y="-22" width="91" height="123"/><use href="#green-fruit" x="103" y="-50" width="88" height="119"/><use href="#green-fruit" x="183" y="-34" width="89" height="121"/><use href="#green-fruit" x="266" y="-15" width="83" height="112"/>
+    <use href="#green-fruit" x="67" y="0" width="91" height="123"/><use href="#green-fruit" x="152" y="-7" width="89" height="120"/><use href="#green-fruit" x="230" y="9" width="89" height="120"/>
+    <use href="#crate" x="0" y="64" width="374" height="168"/>
+  </g>
+  <g transform="translate(847 566) rotate(-5)">
+    <path d="M0 45h403L365-8H42Z" fill="#705438"/>
+    <use href="#citrus" x="20" y="-54" width="106" height="116"/><use href="#citrus" x="102" y="-80" width="102" height="111"/><use href="#citrus" x="190" y="-62" width="105" height="115"/><use href="#citrus" x="280" y="-50" width="105" height="115"/>
+    <use href="#citrus" x="61" y="-13" width="108" height="118"/><use href="#citrus" x="149" y="-9" width="110" height="120"/><use href="#citrus" x="245" y="-4" width="105" height="115"/>
+    <use href="#crate" x="0" y="62" width="405" height="182"/>
+  </g>
+  <g transform="translate(1161 708) rotate(5)">
+    <path d="M0 40h348L312-14H34Z" fill="#624d33"/>
+    <use href="#red-fruit" x="12" y="-55" width="95" height="104"/><use href="#red-fruit" x="87" y="-79" width="98" height="107"/><use href="#red-fruit" x="169" y="-66" width="93" height="101"/><use href="#red-fruit" x="248" y="-47" width="94" height="102"/>
+    <use href="#red-fruit" x="38" y="-9" width="98" height="107"/><use href="#red-fruit" x="120" y="-16" width="100" height="109"/><use href="#red-fruit" x="203" y="-5" width="101" height="110"/>
+    <use href="#crate" x="0" y="56" width="351" height="158"/>
+  </g>
+  <use href="#citrus" x="820" y="798" width="95" height="104" transform="rotate(-20 867 850)"/>
+  <use href="#citrus" x="892" y="830" width="90" height="98"/>
+  <path d="M739 855c32-38 56-30 80-20-18 31-54 41-80 20Z" fill="#637f45"/>
+  <path d="M1538 805c-41-115-74-176-144-225 38-8 93 36 119 87-29-101-28-182-1-221 43 43 48 109 34 185 21-68 67-111 111-118-10 85-45 140-90 197Z" fill="#365d3a"/>
+</svg>
