@@ -28,6 +28,19 @@ class FruitCalculatorTest extends TestCase
             'portion_pb' => 1.5, 'portion_pk' => 0.5, 'price' => 10000], $values);
     }
 
+    public function test_bulk_paste_validates_all_fruits_and_respects_region_access(): void
+    {
+        $this->login();
+        $this->postJson($this->base.'/fruits/bulk', ['fruits' => [$this->fields(), $this->fields(['price' => 0])]])->assertUnprocessable();
+        $this->assertDatabaseCount('fruit_catalog', 0);
+        $this->postJson($this->base.'/fruits/bulk?region=Pusat', ['fruits' => [$this->fields()]])->assertForbidden();
+        $this->postJson($this->base.'/fruits/bulk', ['fruits' => [$this->fields(['id' => 999, 'region' => 'Pusat']), $this->fields(['name' => 'Apel'])]])->assertCreated()->assertJson(['count' => 2]);
+        $this->assertDatabaseCount('fruit_catalog', 2);
+        $this->assertDatabaseCount('fruit_catalog_prices', 2);
+        $this->assertDatabaseHas('fruit_catalog', ['name' => 'Anggur', 'region' => 'Garut']);
+        $this->assertDatabaseMissing('fruit_catalog', ['region' => 'Pusat']);
+    }
+
     private function createFruit(): array
     {
         return $this->postJson($this->base.'/fruits', $this->fields())->assertCreated()->json();

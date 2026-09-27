@@ -2,7 +2,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.data('fruitCalculator', (config) => ({
         region: config.region, tab: 'calculate', loaded: false, loading: false, busy: false,
         error: '', message: '', fruits: [], selectedIds: [], budget: '', budgetInput: '', priceInput: '', pb: '', pk: '',
-        date: new Date().toLocaleDateString('en-CA'), editor: null,
+        date: new Date().toLocaleDateString('en-CA'), editor: null, copiedFruits: [],
         historyId: '', days: 7, history: [], historyLoading: false, historyRequest: 0, priceDetailOpen: false, priceDetailOverflow: '',
         archive: [], page: 1, lastPage: 1, report: null, pendingDecision: null, exporting: false,
         init() {
@@ -17,6 +17,12 @@ document.addEventListener('alpine:init', () => {
             if (this.priceDetailOpen) this.closePriceDetail();
             if (this.editor) document.body.style.overflow = this.editorOverflow || '';
         },
+        fruitCategory(fruit) {
+            const firstWord = String(fruit.name || '').trim().split(/\s+/)[0].toLocaleLowerCase('id-ID');
+            return firstWord ? firstWord.charAt(0).toLocaleUpperCase('id-ID') + firstWord.slice(1) : 'Lainnya';
+        },
+        get categories() { return [...new Set(this.fruits.map(fruit => this.fruitCategory(fruit)))].sort((a, b) => a.localeCompare(b, 'id')); },
+        get fruitGroups() { return this.categories.map(name => ({ name, fruits: this.fruits.filter(fruit => this.fruitCategory(fruit) === name) })); },
         ready(fruit) { return ['units_per_kg', 'portion_pb', 'portion_pk', 'price'].every(key => Number(fruit[key]) > 0); },
         get incompleteSelection() { return this.fruits.some(f => this.selectedIds.includes(f.id) && !this.ready(f)); },
         number(value, digits = 2) { return Number(value).toLocaleString('id-ID', { maximumFractionDigits: digits }); },
@@ -84,6 +90,29 @@ document.addEventListener('alpine:init', () => {
         },
         addFruit() {
             this.edit({ name: '', unit: 'Buah', units_per_kg: '', portion_pb: '', portion_pk: '', price: '' });
+        },
+        copyFruit(fruit) { this.copyFruits([fruit]); },
+        copySelectedFruits() { this.copyFruits(this.fruits.filter(fruit => this.selectedIds.includes(fruit.id))); },
+        copyFruits(fruits) {
+            if (this.busy || this.loading || !fruits.length) return;
+            this.copiedFruits = fruits.map(fruit => {
+                const { name, unit, units_per_kg, portion_pb, portion_pk, price } = fruit;
+                return { name, unit, units_per_kg, portion_pb, portion_pk, price };
+            });
+            this.error = '';
+            this.message = fruits.length + ' buah disalin. Pilih SPPG tujuan, lalu klik Tempel buah.';
+        },
+        async pasteFruit() {
+            if (!this.copiedFruits.length || this.busy || this.loading || this.region === 'Semua Wilayah') return;
+            if (this.copiedFruits.length === 1) { this.edit(this.copiedFruits[0]); return; }
+            this.busy = true; this.error = ''; this.message = '';
+            try {
+                const result = await this.api('/fruits/bulk', 'POST', { fruits: this.copiedFruits });
+                this.copiedFruits = [];
+                this.message = result.count + ' buah berhasil ditambahkan ke ' + this.region + '.';
+                await this.load();
+            } catch (error) { this.error = error.message; }
+            finally { this.busy = false; }
         },
         edit(fruit) {
             this.error = ''; this.message = ''; this.editor = { ...fruit }; this.priceInput = formatCurrencyValue(fruit.price); this.tab = 'calculate';

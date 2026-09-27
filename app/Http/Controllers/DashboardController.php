@@ -34,7 +34,7 @@ class DashboardController extends Controller
 
     private function payAll(Request $request, string $column, string $label)
     {
-        abort_unless($request->user()->isSuperAdmin(), 403, 'Hanya superadmin yang dapat membayar semua '.$label.'.');
+        abort_unless($request->user()->isSuperAdmin(), 403, 'Hanya superadmin yang dapat membayar '.$label.'.');
 
         $validated = $request->validate([
             'ids' => ['required', 'array', 'min:1'],
@@ -46,7 +46,7 @@ class DashboardController extends Controller
             ->where($column, false)
             ->update([$column => true]);
 
-        return redirect()->back()->with('success', 'Semua '.$label.' pada rincian berhasil dilunasi.');
+        return redirect()->back()->with('success', ucfirst($label).' yang dipilih berhasil dilunasi.');
     }
 
     /**
@@ -58,6 +58,15 @@ class DashboardController extends Controller
 
         // 1. Jika dikirim via POST (Filter di-submit), simpan nilai input ke Session
         if ($request->isMethod('post')) {
+            $request->validate([
+                'date_from' => ['nullable', 'date_format:Y-m-d'],
+                'date_to' => ['nullable', 'date_format:Y-m-d', ...($request->filled('date_from') ? ['after_or_equal:date_from'] : [])],
+            ], [
+                'date_from.date_format' => 'Tanggal mulai tidak valid.',
+                'date_to.date_format' => 'Tanggal akhir tidak valid.',
+                'date_to.after_or_equal' => 'Tanggal akhir harus sama dengan atau setelah tanggal mulai.',
+            ]);
+
             session([
                 'filter_region'    => $request->input('region'),
                 'filter_status'    => $request->input('status'),
@@ -122,8 +131,12 @@ class DashboardController extends Controller
             });
         }
 
-        if (!empty($sessionDateFrom) && !empty($sessionDateTo)) {
-            $query->whereBetween('transaction_date', [$sessionDateFrom, $sessionDateTo]);
+        if (!empty($sessionDateFrom)) {
+            $query->whereDate('transaction_date', '>=', $sessionDateFrom);
+        }
+
+        if (!empty($sessionDateTo)) {
+            $query->whereDate('transaction_date', '<=', $sessionDateTo);
         }
 
         // 6. Data Purchase Orders dengan Pagination (Hapus withQueryString agar URL tetap bersih)

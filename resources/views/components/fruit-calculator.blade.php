@@ -8,6 +8,10 @@
     class="fruit-tool mx-auto min-h-screen max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <style>
         .fruit-tool { letter-spacing: 0; }
+        .fruit-tool .fruit-category { margin-top: 12px; border: 1px solid #cdd7cf; border-radius: 8px; overflow: hidden; }
+        .fruit-tool .fruit-category > summary { cursor: pointer; padding: 14px; background: #edf2ef; color: #1c3328; font-size: 14px; font-weight: 700; }
+        .fruit-tool .fruit-category-content { padding: 14px; }
+        .fruit-tool .fruit-category > summary:focus-visible { outline: 2px solid #267c66; outline-offset: -2px; }
         .fruit-tool label { font-size: 12px; font-weight: 600; color: #435348; }
         .fruit-tool input:not([type=checkbox]), .fruit-tool select { display: block; width: 100%; min-width: 0; margin-top: 6px; border: 1px solid #cdd7cf; border-radius: 6px; background: white; padding: 10px 12px; font-size: 14px; color: #1c3328; }
         .fruit-tool input[type=checkbox] { width: 17px; height: 17px; accent-color: #123d2c; flex-shrink: 0; }
@@ -104,6 +108,7 @@
     <div x-show="message" role="status" class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" x-text="message"></div>
     <p x-show="loading" role="status" class="text-sm text-[#687168]">Memuat data...</p>
 
+
     <div id="fruit-calculate" role="tabpanel" aria-labelledby="fruit-tab-calculate" x-show="tab === 'calculate'" class="space-y-6">
         <div class="fruit-panel">
             <div class="fruit-section-heading"><div><h2><span class="fruit-step">01</span>Rencana menu</h2><p>Isi tanggal, anggaran buah, dan jumlah penerima manfaat (PM).</p></div></div>
@@ -115,10 +120,22 @@
         </fieldset>
         </div>
         <div class="fruit-panel">
-            <div class="fruit-section-heading"><div><h2><span class="fruit-step">02</span>Pilih kandidat buah</h2><p>Pilih buah dari katalog untuk dibandingkan.</p></div><div class="flex items-center gap-3"><span class="fruit-count" x-text="selectedIds.length + ' buah dipilih'"></span><button class="fruit-btn fruit-primary" @click="addFruit()" :disabled="busy || loading || region === 'Semua Wilayah'">Tambah buah</button></div></div>
+            <div class="fruit-section-heading"><div><h2><span class="fruit-step">02</span>Pilih kandidat buah</h2><p>Pilih buah dari katalog untuk dibandingkan.</p></div><div class="flex flex-wrap items-center gap-3"><button type="button" class="fruit-btn" @click="copySelectedFruits()" :disabled="busy || loading || !selectedIds.length">Salin buah dipilih</button><span class="fruit-count" x-text="selectedIds.length + ' buah dipilih'"></span><button class="fruit-btn fruit-primary" @click="addFruit()" :disabled="busy || loading || region === 'Semua Wilayah'">Tambah buah</button></div></div>
             <p x-show="loaded && !fruits.length" class="fruit-empty text-sm text-[#687168]">Katalog buah masih kosong. Klik Tambah buah untuk mengisi katalog.</p>
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                <template x-for="fruit in fruits" :key="fruit.id">
+            <div x-show="copiedFruits.length" class="mb-3 rounded-md border border-[#cdd7cf] bg-[#edf2ef] p-3">
+                <p class="text-sm font-semibold text-[#1c3328]" x-text="'Disalin: ' + copiedFruits.length + ' buah — ' + copiedFruits.map(fruit => fruit.name).join(', ')"></p>
+                <p class="mt-1 text-xs text-[#687168]" x-text="region === 'Semua Wilayah' ? 'Pilih satu SPPG tujuan pada pilihan Wilayah untuk menempelkan buah.' : 'Tujuan: ' + region + '. Klik Tempel buah untuk menambahkan salinan sebagai data baru.'"></p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <button type="button" class="fruit-btn fruit-primary" @click="pasteFruit()" :disabled="busy || loading || region === 'Semua Wilayah'">Tempel buah</button>
+                    <button type="button" class="fruit-btn" @click="copiedFruits = []" :disabled="busy">Batal salin</button>
+                </div>
+            </div>
+            <p class="text-xs text-[#687168]">Klik kategori untuk menampilkan atau menyembunyikan buah.</p>
+            <template x-for="group in fruitGroups" :key="group.name">
+                <details class="fruit-category">
+                    <summary><span x-text="group.name"></span> <span class="fruit-count" x-text="group.fruits.length + ' buah'"></span></summary>
+            <div class="fruit-category-content grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <template x-for="fruit in group.fruits" :key="fruit.id">
                     <div class="fruit-card" :class="{ 'is-selected': selectedIds.includes(fruit.id) }">
                         <label class="flex cursor-pointer items-start gap-3">
                             <input class="mt-1" type="checkbox" :value="fruit.id" x-model.number="selectedIds" :disabled="busy || loading || (!selectedIds.includes(fruit.id) && selectedIds.length >= 100)">
@@ -130,10 +147,15 @@
                                 <span x-show="increase(fruit) > 15" class="mt-2 block text-xs text-rose-700" x-text="'Harga naik ' + number(increase(fruit), 1) + '% dari rata-rata harga 7 hari sebelumnya'"></span>
                             </span>
                         </label>
-                        <button class="fruit-btn mt-3" @click="edit(fruit)" :disabled="busy || loading">Edit buah</button>
+                        <div class="mt-3 flex flex-wrap gap-2">
+                            <button type="button" class="fruit-btn" @click="edit(fruit)" :disabled="busy || loading">Edit buah</button>
+                            <button type="button" class="fruit-btn" @click="copyFruit(fruit)" :disabled="busy || loading" :aria-label="'Salin ' + fruit.name">Salin buah</button>
+                        </div>
                     </div>
                 </template>
             </div>
+                </details>
+            </template>
         </div>
         <template x-if="editor">
             <dialog x-ref="parameterDialog" class="fruit-parameter-dialog shadow-xl" aria-labelledby="fruit-parameter-title" @cancel.prevent="closeEditor()" @click="if ($event.target === $el) closeEditor()">
@@ -143,6 +165,7 @@
                     <button type="button" @click="closeEditor()" :disabled="busy" class="fruit-btn shrink-0" aria-label="Tutup parameter porsi" title="Tutup">&#215;</button>
                 </div>
                 <p x-show="error" role="alert" class="mb-4 rounded-md bg-rose-50 p-3 text-sm text-rose-800" x-text="error"></p>
+                <p x-show="!editor.id" class="mb-4 text-sm text-[#435348]" x-text="'Simpan buah baru ke SPPG: ' + region"></p>
                 <fieldset :disabled="busy || loading" class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <label>Nama buah<input x-model="editor.name" maxlength="255" required></label>
                     <label>Satuan porsi<select x-model="editor.unit"><option>Butir</option><option>Sisir</option><option>Potong</option><option>Buah</option></select></label>

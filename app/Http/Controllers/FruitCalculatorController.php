@@ -78,18 +78,43 @@ class FruitCalculatorController extends Controller
         return response()->json($this->candidate($this->catalog($region)->find($id)), 201);
     }
 
-    private function profileData(Request $request): array
+    private function profileRules(): array
     {
-        $data = $request->validate([
+        return [
             'name' => ['required', 'string', 'max:255'],
             'unit' => ['required', Rule::in(['Butir', 'Sisir', 'Potong', 'Buah'])],
             'units_per_kg' => ['required', 'numeric', 'min:0.0001', 'max:100000', 'decimal:0,4'],
             'portion_pb' => ['required', 'numeric', 'min:0.0001', 'max:1000', 'decimal:0,4'],
             'portion_pk' => ['required', 'numeric', 'min:0.0001', 'max:1000', 'decimal:0,4'],
             'price' => ['required', 'numeric', 'min:0.01', 'max:100000000', 'decimal:0,2'],
-        ]);
+        ];
+    }
 
-        return $data;
+    private function profileData(Request $request): array
+    {
+        return $request->validate($this->profileRules());
+    }
+
+    public function storeMany(Request $request)
+    {
+        $region = $this->region($request);
+        if ($region === self::ALL_REGIONS) {
+            throw ValidationException::withMessages(['region' => 'Pilih satu SPPG tujuan.']);
+        }
+        $rules = ['fruits' => ['required', 'array', 'min:1', 'max:100']];
+        foreach ($this->profileRules() as $field => $rule) {
+            $rules['fruits.*.'.$field] = $rule;
+        }
+        $data = $request->validate($rules);
+        DB::transaction(function () use ($data, $region, $request) {
+            foreach ($data['fruits'] as $fruit) {
+                $profile = array_intersect_key($fruit, $this->profileRules());
+                $id = DB::table('fruit_catalog')->insertGetId($profile + ['region' => $region, 'version' => 1, 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('fruit_catalog_prices')->insert(['fruit_id' => $id, 'user_id' => $request->user()->id, 'price' => $profile['price'], 'created_at' => now()]);
+            }
+        });
+
+        return response()->json(['count' => count($data['fruits'])], 201);
     }
 
     public function update(Request $request, int $fruit)

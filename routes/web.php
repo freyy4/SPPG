@@ -28,6 +28,7 @@ Route::get('/verify/payment/{type}', [DashboardController::class, 'verifyPayment
 Route::middleware(['auth'])->group(function () {
     Route::prefix('dashboard/fruit-calculator')->name('fruit-calculator.')->group(function () {
         Route::get('/', [FruitCalculatorController::class, 'index'])->name('index');
+        Route::post('/fruits/bulk', [FruitCalculatorController::class, 'storeMany']);
         Route::post('/fruits', [FruitCalculatorController::class, 'store']);
         Route::put('/fruits/{fruit}', [FruitCalculatorController::class, 'update']);
         Route::get('/fruits/{fruit}/history', [FruitCalculatorController::class, 'history']);

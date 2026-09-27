@@ -565,10 +565,46 @@
         }
     }
     </script>   
-    <script src="{{ asset('js/fruit-calculator.js') }}?v=7"></script>
+    <script src="{{ asset('js/fruit-calculator.js') }}?v=11"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <style>
         [x-cloak] { display: none !important; }
+        .dashboard-filters { padding: 20px; }
+        .dashboard-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; list-style: none; }
+        .dashboard-filter-heading::-webkit-details-marker { display: none; }
+        .dashboard-filter-heading:focus-visible { outline: 2px solid #267c66; outline-offset: 6px; border-radius: 4px; }
+        .dashboard-filter-heading::after { content: '\25BE'; color: #435348; font-size: 20px; }
+        .dashboard-filters[open] > .dashboard-filter-heading::after { transform: rotate(180deg); }
+        .dashboard-filter-form { margin-top: 18px; }
+        .dashboard-filter-heading h2 { font-size: 15px; font-weight: 800; color: #1c3328; }
+        .dashboard-filter-heading p { margin-top: 4px; font-size: 12px; color: #687168; }
+        .dashboard-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
+        .dashboard-filter-field { min-width: 0; }
+        .dashboard-filter-wide { grid-column: span 2; }
+        .dashboard-filter-field label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: #435348; }
+        .dashboard-filters .dashboard-filter-control { display: block; box-sizing: border-box; width: 100%; min-width: 0; height: 44px; margin: 0; padding: 10px 12px; border: 1px solid #cdd7cf; border-radius: 8px; background-color: #fff; color: #1c3328; font-size: 14px; }
+        .dashboard-filters select.dashboard-filter-control { padding-right: 32px; text-overflow: ellipsis; }
+        .dashboard-filter-control::placeholder { color: #829087; }
+        .dashboard-filters .dashboard-filter-control:disabled { background-color: #f0f3ef; color: #687168; cursor: not-allowed; }
+        .dashboard-filters .dashboard-filter-control:focus { outline: 2px solid #267c66; outline-offset: 2px; border-color: #267c66; box-shadow: none; }
+        .dashboard-filter-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8e4; }
+        .dashboard-filter-actions button, .dashboard-filter-actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; }
+        .dashboard-filter-apply { background: #123d2c; color: white; border: 1px solid #123d2c; }
+        .dashboard-filter-apply:hover { background: #0a291e; }
+        .dashboard-filter-reset { background: white; color: #435348; border: 1px solid #cdd7cf; }
+        .dashboard-filter-reset:hover { background: #edf2ef; }
+        .dashboard-filter-actions :focus-visible { outline: 2px solid #267c66; outline-offset: 3px; }
+        @media (max-width: 767px) {
+            .dashboard-filters { padding: 16px; }
+            .dashboard-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
+            .dashboard-filters .dashboard-filter-control { font-size: 16px; }
+            .dashboard-filter-actions button { flex: 1; }
+        }
+        @media (max-width: 359px) {
+            .dashboard-filter-grid { grid-template-columns: minmax(0, 1fr); }
+            .dashboard-filter-wide { grid-column: auto; }
+        }
+
         :root { --sbg-green: #123d2c; --sbg-dark: #0a291e; --sbg-cream: #f7f7f0; --sbg-gold: #f3a51d; }
         body { font-family: 'DM Sans', sans-serif; }
         .sbg-heading { font-family: 'Manrope', sans-serif; }
@@ -827,27 +863,46 @@
         </div>
 
         <!-- FILTER BAR -->
-        <form id="data-po" method="POST" action="{{ route('dashboard') }}" class="sbg-panel scroll-mt-28 grid grid-cols-1 gap-3 p-4 sm:grid-cols-2 md:grid-cols-5">
+        <details id="data-po" class="sbg-panel dashboard-filters scroll-mt-28" @if($errors->has('date_from') || $errors->has('date_to') || collect(['search', 'status', 'priority', 'region', 'date_from', 'date_to'])->contains(fn ($key) => filled(session('filter_'.$key)))) open @endif>
+            <summary class="dashboard-filter-heading">
+                <div>
+                <h2 id="dashboard-filter-title">Filter data PO</h2>
+                <p>Klik untuk membuka atau menutup pilihan filter.</p>
+                </div>
+            </summary>
+            <form method="POST" action="{{ route('dashboard') }}" class="dashboard-filter-form" aria-labelledby="dashboard-filter-title">
             @csrf
-            <input type="text" name="search" value="{{ session('filter_search') }}" placeholder="Cari Barang / Supplier / PO..." class="w-full text-xs sm:text-sm border-gray-200 rounded-xl px-3.5 py-2.5 border focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition">
+            <div class="dashboard-filter-grid">
+            <div class="dashboard-filter-field dashboard-filter-wide">
+                <label for="po-filter-search">Pencarian</label>
+                <input id="po-filter-search" type="search" name="search" value="{{ session('filter_search') }}" placeholder="Nama barang, supplier, atau nomor PO" class="dashboard-filter-control">
+            </div>
             
-            <select name="status" class="w-full text-xs sm:text-sm border-gray-200 rounded-xl px-3.5 py-2.5 border focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white">
+            <div class="dashboard-filter-field">
+                <label for="po-filter-status">Status</label>
+            <select id="po-filter-status" name="status" class="dashboard-filter-control">
                 <option value="">Semua Status</option>
                 <option value="Pending" {{ session('filter_status') == 'Pending' ? 'selected' : '' }}>Pending</option>
                 <option value="Proses" {{ session('filter_status') == 'Proses' ? 'selected' : '' }}>Proses</option>
                 <option value="Selesai" {{ session('filter_status') == 'Selesai' ? 'selected' : '' }}>Selesai</option>
                 <option value="Batal" {{ session('filter_status') == 'Batal' ? 'selected' : '' }}>Batal</option>
             </select>
+            </div>
 
-            <select name="priority" class="w-full text-xs sm:text-sm border-gray-200 rounded-xl px-3.5 py-2.5 border focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white">
+            <div class="dashboard-filter-field">
+                <label for="po-filter-priority">Prioritas</label>
+            <select id="po-filter-priority" name="priority" class="dashboard-filter-control">
                 <option value="">Semua Prioritas</option>
                 <option value="Urgent" {{ session('filter_priority') == 'Urgent' ? 'selected' : '' }}>Urgent</option>
                 <option value="High" {{ session('filter_priority') == 'High' ? 'selected' : '' }}>High</option>
                 <option value="Normal" {{ session('filter_priority') == 'Normal' ? 'selected' : '' }}>Normal</option>
             </select>
+            </div>
 
             <!-- SELECT OPTION DAERAH -->
-            <select name="region" class="w-full text-xs sm:text-sm border-gray-200 rounded-xl px-3.5 py-2.5 border focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition bg-white" {{ !auth()->user()->isSuperAdmin() ? 'disabled' : '' }}>
+            <div class="dashboard-filter-field dashboard-filter-wide">
+                <label for="po-filter-region">Wilayah</label>
+            <select id="po-filter-region" name="region" class="dashboard-filter-control" {{ !auth()->user()->isSuperAdmin() ? 'disabled' : '' }}>
                 <option value="">Semua Wilayah</option>
                 @foreach($regions as $reg)
                     <option value="{{ $reg->name }}" {{ (session('filter_region') ?? auth()->user()->region) == $reg->name ? 'selected' : '' }}>
@@ -855,12 +910,26 @@
                     </option>
                 @endforeach
             </select>
-
-            <div class="flex space-x-2">
-                <button type="submit" class="w-full bg-[#123d2c] text-white rounded-md text-xs sm:text-sm font-bold py-2.5 hover:bg-[#0a291e] transition active:scale-95 shadow-sm">Filter</button>
-                <a href="{{ route('dashboard.reset') }}" class="px-4 py-2.5 bg-[#e9efe6] text-[#435348] rounded-md text-xs sm:text-sm font-bold hover:bg-[#dce3d3] transition text-center flex items-center justify-center">Reset</a>
             </div>
-        </form>
+
+            <div class="dashboard-filter-field">
+                <label for="date_from" >Tanggal mulai</label>
+                <input id="date_from" type="date" name="date_from" value="{{ old('date_from', session('filter_date_from')) }}" class="dashboard-filter-control">
+                @error('date_from') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            </div>
+            <div class="dashboard-filter-field">
+                <label for="date_to" >Tanggal akhir</label>
+                <input id="date_to" type="date" name="date_to" value="{{ old('date_to', session('filter_date_to')) }}" class="dashboard-filter-control">
+                @error('date_to') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
+            </div>
+
+            </div>
+            <div class="dashboard-filter-actions">
+                <button type="submit" class="dashboard-filter-apply">Terapkan filter</button>
+                <a href="{{ route('dashboard.reset') }}" class="dashboard-filter-reset">Reset</a>
+            </div>
+            </form>
+        </details>
 
         <!-- TABLE PURCHASE ORDERS -->
         <div class="sbg-panel overflow-hidden">
@@ -1096,19 +1165,19 @@
                     <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Download PDF</button>
                     <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Kirim ke WhatsApp</button>
                     @if(auth()->user()->isSuperAdmin())
-                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting) { submitting = true; $el.submit(); }" action="{{ route('dashboard.partner-fee.pay-all') }}" method="POST" class="sm:col-span-2">
+                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting && selectedIds.length > 0) { submitting = true; $el.submit(); }" action="{{ route('dashboard.partner-fee.pay-all') }}" method="POST" class="sm:col-span-2">
                             @csrf
-                            <template x-for="item in items.filter(item => !item.is_partner_fee_paid)" :key="item.id">
+                            <template x-for="item in selectedItems().filter(item => !item.is_partner_fee_paid)" :key="item.id">
                                 <input type="hidden" name="ids[]" :value="item.id">
                             </template>
-                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || !items.some(item => !item.is_partner_fee_paid)" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar Semua Fee Mitra</button>
+                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar yang sudah diceklis</button>
                             <div x-show="confirming" x-cloak x-transition.opacity @keydown.escape.stop.prevent="if (!submitting) confirming = false" class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#0a291e]/40 backdrop-blur-sm p-5">
                                 <div role="dialog" aria-modal="true" aria-labelledby="confirm-partner-payment-title" aria-describedby="confirm-partner-payment-description" class="sbg-modal-confirm w-full rounded-lg bg-white p-6 shadow-xl space-y-4">
-                                    <h4 id="confirm-partner-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar Semua Fee Mitra?</h4>
-                                    <p id="confirm-partner-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin bayar semua?</p>
+                                    <h4 id="confirm-partner-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar yang sudah diceklis?</h4>
+                                    <p id="confirm-partner-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin membayar hanya item yang sudah diceklis?</p>
                                     <div class="grid grid-cols-2 gap-3">
                                         <button x-ref="cancelPayment" type="button" @click="confirming = false" :disabled="submitting" class="rounded-md bg-[#f7f7f0] px-4 py-2.5 text-xs font-bold text-[#435348] hover:bg-[#e9efe6] disabled:opacity-50">Batal</button>
-                                        <button type="submit" :disabled="submitting" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar Semua'">Ya, Bayar Semua</button>
+                                        <button type="submit" :disabled="submitting || selectedIds.length === 0" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar yang Dipilih'">Ya, Bayar yang Dipilih</button>
                                     </div>
                                 </div>
                             </div>
@@ -1186,19 +1255,19 @@
                     <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Download PDF</button>
                     <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Kirim ke WhatsApp</button>
                     @if(auth()->user()->isSuperAdmin())
-                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting) { submitting = true; $el.submit(); }" action="{{ route('dashboard.supplier.pay-all') }}" method="POST" class="sm:col-span-2">
+                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting && selectedIds.length > 0) { submitting = true; $el.submit(); }" action="{{ route('dashboard.supplier.pay-all') }}" method="POST" class="sm:col-span-2">
                             @csrf
-                            <template x-for="item in items.filter(item => !item.is_supplier_paid)" :key="item.id">
+                            <template x-for="item in selectedItems().filter(item => !item.is_supplier_paid)" :key="item.id">
                                 <input type="hidden" name="ids[]" :value="item.id">
                             </template>
-                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || !items.some(item => !item.is_supplier_paid)" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar Semua Supplier</button>
+                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar yang sudah diceklis</button>
                             <div x-show="confirming" x-cloak x-transition.opacity @keydown.escape.stop.prevent="if (!submitting) confirming = false" class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#0a291e]/40 backdrop-blur-sm p-5">
                                 <div role="dialog" aria-modal="true" aria-labelledby="confirm-supplier-payment-title" aria-describedby="confirm-supplier-payment-description" class="sbg-modal-confirm w-full rounded-lg bg-white p-6 shadow-xl space-y-4">
-                                    <h4 id="confirm-supplier-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar Semua Supplier?</h4>
-                                    <p id="confirm-supplier-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin bayar semua?</p>
+                                    <h4 id="confirm-supplier-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar yang sudah diceklis?</h4>
+                                    <p id="confirm-supplier-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin membayar hanya item yang sudah diceklis?</p>
                                     <div class="grid grid-cols-2 gap-3">
                                         <button x-ref="cancelPayment" type="button" @click="confirming = false" :disabled="submitting" class="rounded-md bg-[#f7f7f0] px-4 py-2.5 text-xs font-bold text-[#435348] hover:bg-[#e9efe6] disabled:opacity-50">Batal</button>
-                                        <button type="submit" :disabled="submitting" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar Semua'">Ya, Bayar Semua</button>
+                                        <button type="submit" :disabled="submitting || selectedIds.length === 0" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar yang Dipilih'">Ya, Bayar yang Dipilih</button>
                                     </div>
                                 </div>
                             </div>
@@ -1275,19 +1344,19 @@
                     <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Download PDF</button>
                     <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Kirim ke WhatsApp</button>
                     @if(auth()->user()->isSuperAdmin())
-                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting) { submitting = true; $el.submit(); }" action="{{ route('dashboard.ksppg-fee.pay-all') }}" method="POST" class="sm:col-span-2">
+                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting && selectedIds.length > 0) { submitting = true; $el.submit(); }" action="{{ route('dashboard.ksppg-fee.pay-all') }}" method="POST" class="sm:col-span-2">
                             @csrf
-                            <template x-for="item in items.filter(item => !item.is_ksppg_fee_paid)" :key="item.id">
+                            <template x-for="item in selectedItems().filter(item => !item.is_ksppg_fee_paid)" :key="item.id">
                                 <input type="hidden" name="ids[]" :value="item.id">
                             </template>
-                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || !items.some(item => !item.is_ksppg_fee_paid)" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar Semua Fee KSPPG</button>
+                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar yang sudah diceklis</button>
                             <div x-show="confirming" x-cloak x-transition.opacity @keydown.escape.stop.prevent="if (!submitting) confirming = false" class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#0a291e]/40 backdrop-blur-sm p-5">
                                 <div role="dialog" aria-modal="true" aria-labelledby="confirm-ksppg-payment-title" aria-describedby="confirm-ksppg-payment-description" class="sbg-modal-confirm w-full rounded-lg bg-white p-6 shadow-xl space-y-4">
-                                    <h4 id="confirm-ksppg-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar Semua Fee KSPPG?</h4>
-                                    <p id="confirm-ksppg-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin bayar semua?</p>
+                                    <h4 id="confirm-ksppg-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar yang sudah diceklis?</h4>
+                                    <p id="confirm-ksppg-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin membayar hanya item yang sudah diceklis?</p>
                                     <div class="grid grid-cols-2 gap-3">
                                         <button x-ref="cancelPayment" type="button" @click="confirming = false" :disabled="submitting" class="rounded-md bg-[#f7f7f0] px-4 py-2.5 text-xs font-bold text-[#435348] hover:bg-[#e9efe6] disabled:opacity-50">Batal</button>
-                                        <button type="submit" :disabled="submitting" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar Semua'">Ya, Bayar Semua</button>
+                                        <button type="submit" :disabled="submitting || selectedIds.length === 0" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar yang Dipilih'">Ya, Bayar yang Dipilih</button>
                                     </div>
                                 </div>
                             </div>
