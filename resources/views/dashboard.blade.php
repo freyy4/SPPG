@@ -101,6 +101,12 @@
                 }[this.paymentType];
             },
             amount(item) {
+                if (this.paymentType === 'supplier') {
+                    return Number(item.total_supplier_amount ?? (Number(item.quantity_sbg ?? item.quantity ?? 0) * Number(item.supplier_price || 0)));
+                }
+                if (this.paymentType === 'ksppg_fee') {
+                    return Number(item.total_ksppg_fee ?? (Number(item.quantity_sbg ?? item.quantity ?? 0) * Number(item.ksppg_margin_per_unit || 0)));
+                }
                 return Number(item[this.config.total] ?? (Number(item[this.config.unit] || 0) * Number(item.quantity || 0)));
             },
             noteAmount(item) {
@@ -129,26 +135,18 @@
             selectableItems() {
                 return this.items.filter(item => !item[this.config.paid]);
             },
-
             allSelected() {
                 const ids = this.selectableItems().map(item => String(item.id));
                 return ids.length > 0 && ids.every(id => this.selectedIds.includes(id));
             },
-
             toggleAll() {
-                this.selectedIds = this.allSelected()
-                    ? []
-                    : this.selectableItems().map(item => String(item.id));
+                this.selectedIds = this.allSelected() ? [] : this.selectableItems().map(item => String(item.id));
             },
-
             selectedItems() {
                 return this.items.filter(item => this.selectedIds.includes(String(item.id)));
             },
-
             selectedTotal() {
-                return this.selectedItems().reduce((total, item) => {
-                    return total + this.amount(item);
-                }, 0);
+                return this.selectedItems().reduce((total, item) => total + this.amount(item), 0);
             },
 
             async verificationQrDataUrl() {
@@ -226,7 +224,7 @@
                         <h1>SENTRA BUAH GARUT</h1>
                         <p class="address">Jl. Ahmad Yani Timur Karangpawitan Garut</p>
                     </header><div class="meta"><span>Tanggal cetak: <strong>${new Date().toLocaleDateString('id-ID')}</strong></span><span>${selected.length} barang</span></div>
-                    <table><thead><tr><th>No.</th><th>Item / Nomor PO</th><th>Qty</th><th>Harga Maker</th><th class="right">Subtotal</th></tr></thead>
+                    <table><thead><tr><th>No.</th><th>Item / Nomor PO</th><th>Qty</th><th>Harga</th><th class="right">Subtotal</th></tr></thead>
                     <tbody>${rows}</tbody></table>
                     <div class="total"><span>TOTAL</span><strong>${rupiah(this.noteTotal())}</strong></div>
                     <div class="verify">${qrMarkup}<p class="verified">✓ VERIFIED</p><p>Scan untuk melihat daftar barang terpilih</p></div>
@@ -287,7 +285,7 @@
 
                 documentPdf.autoTable({
                     startY: 42,
-                    head: [['No.', 'Item / Nomor PO', 'Qty', 'Harga Maker', 'Subtotal']],
+                    head: [['No.', 'Item / Nomor PO', 'Qty', 'Harga', 'Subtotal']],
                     body: rows,
                     theme: 'grid',
                     styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: [17, 24, 39] },
@@ -306,7 +304,7 @@
                 documentPdf.setTextColor(255, 255, 255);
                 documentPdf.setFont('helvetica', 'bold');
                 documentPdf.setFontSize(9);
-                documentPdf.text('TOTAL HARGA MAKER', 125, totalY + 6);
+                documentPdf.text('TOTAL HARGA', 125, totalY + 6);
                 documentPdf.setFontSize(13);
                 documentPdf.text(rupiah(this.noteTotal()), 191, totalY + 11, { align: 'right' });
 
@@ -390,8 +388,10 @@
             // State Selected PO & Edit PO
             selectedPo: {},
             editPo: {},
+            createQuantities: { sbg: 0, b: 0 },
             createPrices: {
                 supplier_price: '',
+                supplier_price_b: '0',
                 maker_price: '',
                 partner_margin: ''
             },
@@ -451,8 +451,11 @@
             openEditModal(po) {
                 this.isDetailModalOpen = false;
                 this.editPo = JSON.parse(JSON.stringify(po));
+                this.editPo.quantity_sbg = po.quantity_sbg ?? po.quantity;
+                this.editPo.quantity_b = po.quantity_b ?? 0;
                 this.editPo.transaction_date = this.toDateInputValue(po.transaction_date);
                 this.editPo.supplier_price = formatCurrencyValue(po.supplier_price);
+                this.editPo.supplier_price_b = formatCurrencyValue(po.supplier_price_b ?? po.supplier_price);
                 this.editPo.maker_price = formatCurrencyValue(po.maker_price);
                 this.editPo.partner_margin = formatCurrencyValue(po.partner_margin);
                 this.isEditModalOpen = true;
@@ -518,6 +521,30 @@
             printWindow.print();
             printWindow.close();
         }, 600);
+    }
+    function poAnalysisModal() {
+        return {
+            open: false, loading: false, error: '', requestId: 0, appliedMonth: '',
+            filters: { source: 'supplier_sbg', category: 'Buah', year: new Date().getFullYear(), month: '', region: '', item: '' },
+            months: ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'],
+            categories: ['Karbo','Protein Nabati','Protein Hewani','Sayur','Buah'],
+            data: { rows: [], items: [], regions: [], excluded: 0, year: '' },
+            rupiah(value) { return 'Rp ' + Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 2 }); },
+            visibleMonths(row) { return this.appliedMonth ? row.months.filter(m => m.month === Number(this.appliedMonth)) : row.months; },
+            async fetchData() {
+                const requestId = ++this.requestId;
+                const filters = { ...this.filters };
+                this.loading = true; this.error = '';
+                try {
+                    const response = await fetch('{{ route('dashboard.po-analysis') }}?' + new URLSearchParams(filters), { headers: { Accept: 'application/json' } });
+                    if (!response.ok) throw new Error(response.status === 422 ? 'Filter tidak valid. Periksa tahun dan pilihan filter.' : 'Analisa PO gagal dimuat.');
+                    const data = await response.json();
+                    if (requestId === this.requestId) { this.data = data; this.appliedMonth = filters.month; }
+                } catch (error) {
+                    if (requestId === this.requestId) this.error = error.message;
+                } finally { if (requestId === this.requestId) this.loading = false; }
+            }
+        };
     }
     function analisaKeuntunganModal() {
         return {
@@ -650,7 +677,7 @@
     <!-- NAVBAR: identitas visual mengikuti landing page Sentra Buah Garut -->
     <header x-data="{ mobileNav: false, accountOpen: false }" class="sticky top-0 z-50 border-b border-[#dce1d6] bg-[#f7f7f0]/95 backdrop-blur-xl">
         <div class="mx-auto flex min-h-[82px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <a href="{{ route('home') }}" class="flex shrink-0 items-center gap-3" aria-label="Sentra Buah Garut - beranda">
+            <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-3" aria-label="Sentra Buah Garut - dashboard">
                 <img src="{{ asset('favicon.svg') }}" alt="" class="h-11 w-11 object-contain">
                 <span class="flex flex-col">
                     <strong class="sbg-heading text-[15px] font-extrabold tracking-tight text-[#1c3328] sm:text-[17px]">Sentra Buah Garut</strong>
@@ -767,6 +794,9 @@
                         <span class="text-sm font-semibold text-[#d8e3d5]">Rp</span> 
                         <span>{{ number_format($summary['total_nilai_po'] ?? 0, 0, ',', '.') }}</span>
                     </div>
+                    @if(auth()->user()->isSuperAdmin())
+                    <button type="button" @click.stop="$dispatch('open-po-analysis')" class="mt-4 rounded-md bg-white/15 px-3 py-2 text-xs font-bold text-white hover:bg-white/25 focus:ring-2 focus:ring-white">Analisa PO</button>
+                    @endif
                 </div>
 
                 <!-- PO Pending -->
@@ -1134,16 +1164,26 @@
                 <template x-if="items.length > 0">
                     <div>
                         <template x-for="item in items" :key="item.id">
-                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-center gap-3 text-xs mb-3" :class="item.is_partner_fee_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
+                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-start gap-3 text-xs mb-3" :class="item.is_partner_fee_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
                                 <input type="checkbox" :value="String(item.id)" x-model="selectedIds" :disabled="item.is_partner_fee_paid" class="w-4 h-4 shrink-0 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547] disabled:cursor-not-allowed">
                                 <div class="space-y-0.5 min-w-0 flex-1">
                                     <h4 class="font-bold text-[#1c3328]" x-text="item.item_name"></h4>
                                     <p class="text-[#687168] text-[11px]" x-text="inputDate(item)"></p>
-                                    <p class="text-[#687168] text-[11px]" x-text="(item.quantity || 0) + ' ' + (item.unit || '') + ' x ' + formatRupiah(item.partner_margin)"></p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_partner_fee_paid ? 0 : (item.total_partner_fee || (item.partner_margin * item.quantity)))"></span>
+                                    <div class="space-y-2 pt-2 text-[11px]">
+                                        <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-800">
+                                            <p class="font-bold break-words" x-text="'SBG = ' + formatRupiah(Number((item.quantity_sbg ?? item.quantity ?? 0)) * Number(item.partner_margin || 0))"></p>
+                                            <p class="mt-0.5" x-text="(item.quantity_sbg ?? item.quantity ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.partner_margin)"></p>
+                                        </div>
+                                        <div class="rounded-md bg-blue-50 px-2 py-1.5 text-blue-800">
+                                            <p class="font-bold break-words" x-text="'B = ' + formatRupiah(Number((item.quantity_b ?? 0)) * Number(item.maker_price || 0))"></p>
+                                            <p class="mt-0.5" x-text="(item.quantity_b ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.maker_price)"></p>
+                                        </div>
+                                    </div>
+                                <div class="mt-3 border-t border-[#dce1d6] pt-2 flex flex-wrap items-center justify-between gap-2">
+                                    <span class="font-bold text-[#435348]">TOTAL</span>
+                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_partner_fee_paid ? 0 : (item.total_partner_fee ?? 0))"></span>
                                     <span :class="item.is_partner_fee_paid ? 'bg-[#e9efe6] text-[#123d2c]' : 'bg-amber-100 text-amber-700'" class="block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 text-center" x-text="item.is_partner_fee_paid ? 'Lunas' : 'Belum Bayar'"></span>
+                                </div>
                                 </div>
                             </label>
                         </template>
@@ -1223,17 +1263,23 @@
                 <template x-if="items.length > 0">
                     <div>
                         <template x-for="item in items" :key="item.id">
-                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-center gap-3 text-xs mb-3" :class="item.is_supplier_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
+                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-start gap-3 text-xs mb-3" :class="item.is_supplier_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
                                 <input type="checkbox" :value="String(item.id)" x-model="selectedIds" :disabled="item.is_supplier_paid" class="w-4 h-4 shrink-0 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547] disabled:cursor-not-allowed">
                                 <div class="space-y-0.5 min-w-0 flex-1">
                                     <h4 class="font-bold text-[#1c3328]" x-text="item.item_name"></h4>
                                     <p class="text-[#687168] text-[11px]" x-text="inputDate(item)"></p>
                                     <p class="text-[#123d2c] font-semibold text-[11px]" x-text="'Supplier: ' + (item.supplier_name || '-')"></p>
-                                    <p class="text-[#687168] text-[11px]" x-text="(item.quantity || 0) + ' ' + (item.unit || '') + ' x ' + formatRupiah(item.supplier_price)"></p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_supplier_paid ? 0 : (item.total_supplier_amount || (item.supplier_price * item.quantity)))"></span>
+                                    <div class="space-y-2 pt-2 text-[11px]">
+                                        <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-800">
+                                            <p class="font-bold break-words" x-text="'SBG = ' + formatRupiah(Number((item.quantity_sbg ?? item.quantity ?? 0)) * Number(item.supplier_price || 0))"></p>
+                                            <p class="mt-0.5" x-text="(item.quantity_sbg ?? item.quantity ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.supplier_price)"></p>
+                                        </div>
+                                    </div>
+                                <div class="mt-3 border-t border-[#dce1d6] pt-2 flex flex-wrap items-center justify-between gap-2">
+                                    <span class="font-bold text-[#435348]">TOTAL</span>
+                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_supplier_paid ? 0 : (item.total_supplier_amount ?? 0))"></span>
                                     <span :class="item.is_supplier_paid ? 'bg-[#e9efe6] text-[#123d2c]' : 'bg-amber-100 text-amber-700'" class="block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 text-center" x-text="item.is_supplier_paid ? 'Lunas' : 'Belum Bayar'"></span>
+                                </div>
                                 </div>
                             </label>
                         </template>
@@ -1313,16 +1359,22 @@
                 <template x-if="items.length > 0">
                     <div>
                         <template x-for="item in items" :key="item.id">
-                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-center gap-3 text-xs mb-3" :class="item.is_ksppg_fee_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
+                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-start gap-3 text-xs mb-3" :class="item.is_ksppg_fee_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
                                 <input type="checkbox" :value="String(item.id)" x-model="selectedIds" :disabled="item.is_ksppg_fee_paid" class="w-4 h-4 shrink-0 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547] disabled:cursor-not-allowed">
                                 <div class="space-y-0.5 min-w-0 flex-1">
                                     <h4 class="font-bold text-[#1c3328]" x-text="item.item_name"></h4>
                                     <p class="text-[#687168] text-[11px]" x-text="inputDate(item)"></p>
-                                    <p class="text-[#687168] text-[11px]" x-text="(item.quantity || 0) + ' ' + (item.unit || '') + ' x ' + formatRupiah(item.ksppg_margin_per_unit)"></p>
-                                </div>
-                                <div class="text-right">
-                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_ksppg_fee_paid ? 0 : (item.total_ksppg_fee || (item.ksppg_margin_per_unit * item.quantity)))"></span>
+                                    <div class="space-y-2 pt-2 text-[11px]">
+                                        <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-800">
+                                            <p class="font-bold break-words" x-text="'SBG = ' + formatRupiah(Number((item.quantity_sbg ?? item.quantity ?? 0)) * Number(item.ksppg_margin_per_unit || 0))"></p>
+                                            <p class="mt-0.5" x-text="(item.quantity_sbg ?? item.quantity ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.ksppg_margin_per_unit)"></p>
+                                        </div>
+                                    </div>
+                                <div class="mt-3 border-t border-[#dce1d6] pt-2 flex flex-wrap items-center justify-between gap-2">
+                                    <span class="font-bold text-[#435348]">TOTAL</span>
+                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_ksppg_fee_paid ? 0 : (item.total_ksppg_fee ?? 0))"></span>
                                     <span :class="item.is_ksppg_fee_paid ? 'bg-[#e9efe6] text-[#123d2c]' : 'bg-amber-100 text-amber-700'" class="block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 text-center" x-text="item.is_ksppg_fee_paid ? 'Lunas' : 'Belum Bayar'"></span>
+                                </div>
                                 </div>
                             </label>
                         </template>
@@ -1625,9 +1677,15 @@
                         @endif
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Jumlah (Qty)</label>
-                            <input type="number" step="any" name="quantity" placeholder="106" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                            <label class="block text-xs font-bold text-emerald-800 mb-1">Qty Gudang SBG</label>
+                            <input type="number" step="any" min="0" name="quantity_sbg" x-model="createQuantities.sbg" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
+                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(createQuantities.sbg || 0) * Number(String(createPrices.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                            <label class="block text-xs font-bold text-blue-800 mb-1">Qty Gudang B</label>
+                            <input type="number" step="any" min="0" name="quantity_b" x-model="createQuantities.b" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
+                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(createQuantities.b || 0) * Number(String(createPrices.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-[#435348] mb-1">Satuan</label>
@@ -1641,11 +1699,19 @@
                     <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">3. Rincian Harga & Margin</p>
                     <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-3 items-end">
                         @if(auth()->user()->canManageFinancials())
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Harga Supplier</label>
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                            <label class="block text-xs font-bold text-emerald-800 mb-1">Harga Supplier Gudang SBG</label>
                             <div class="relative">
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
                                 <input type="text" inputmode="decimal" name="supplier_price" placeholder="8.500" x-model="createPrices.supplier_price" @input="createPrices.supplier_price = formatCurrencyInput($event.target)"
+                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
+                            </div>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                            <label class="block text-xs font-bold text-blue-800 mb-1">Harga Supplier Gudang B</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
+                                <input type="text" inputmode="decimal" name="supplier_price_b" placeholder="8.500" x-model="createPrices.supplier_price_b" @input="createPrices.supplier_price_b = formatCurrencyInput($event.target)"
                                     class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
                             </div>
                         </div>
@@ -1655,7 +1721,7 @@
                             <div class="relative">
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
                                 <input type="text" inputmode="decimal" name="maker_price" placeholder="13.500" x-model="createPrices.maker_price" @input="createPrices.maker_price = formatCurrencyInput($event.target)"
-                                    @if(auth()->user()->canManageFinancials()) :disabled="!hasMinimumCurrencyDigits(createPrices.supplier_price)" @endif
+                                    @if(auth()->user()->canManageFinancials()) :disabled="!hasMinimumCurrencyDigits(createPrices.supplier_price) && !hasMinimumCurrencyDigits(createPrices.supplier_price_b)" @endif
                                     class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white disabled:bg-[#f7f7f0] disabled:text-[#687168] disabled:cursor-not-allowed">
                             </div>
                         </div>
@@ -1763,8 +1829,12 @@
                 </div>
                 @if(auth()->user()->canManageFinancials())
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Harga Supplier</span>
+                    <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-semibold">Harga Supplier Gudang SBG</span>
                     <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.supplier_price)"></span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-gray-50">
+                    <span class="rounded-md bg-blue-50 px-2 py-1 text-blue-800 font-semibold">Harga Supplier Gudang B</span>
+                    <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.supplier_price_b ?? selectedPo.supplier_price)"></span>
                 </div>
                 @endif
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
@@ -1772,18 +1842,25 @@
                     <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.maker_price)"></span>
                 </div>
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Laba Mitra/unit</span>
+                    <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-semibold">Fee Mitra/unit SBG</span>
                     <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.partner_margin)"></span>
+                </div>
+                <div class="flex justify-between items-center py-1 border-b border-gray-50">
+                    <span class="text-[#687168] font-medium">Qty per Gudang</span>
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-bold" x-text="'SBG: ' + (selectedPo.quantity_sbg ?? selectedPo.quantity ?? 0) + ' ' + (selectedPo.unit || '')"></span>
+                        <span class="rounded-md bg-blue-50 px-2 py-1 text-blue-800 font-bold" x-text="'B: ' + (selectedPo.quantity_b ?? 0) + ' ' + (selectedPo.unit || '')"></span>
+                    </div>
                 </div>
                 <!-- TOTALS -->
                 @if(auth()->user()->canManageFinancials())
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
                     <span class="text-[#687168] font-medium">Sisa Bayar Supplier</span>
-                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_supplier_paid ? 0 : (selectedPo.total_supplier_amount || (selectedPo.supplier_price * selectedPo.quantity)))"></span>
+                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_supplier_paid ? 0 : (selectedPo.total_supplier_amount ?? 0))"></span>
                 </div>
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
                     <span class="text-[#687168] font-medium">Sisa Laba Mitra</span>
-                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_partner_fee_paid ? 0 : (selectedPo.total_partner_fee || (selectedPo.partner_margin * selectedPo.quantity)))"></span>
+                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_partner_fee_paid ? 0 : (selectedPo.total_partner_fee ?? 0))"></span>
                 </div>
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
                     <span class="text-[#687168] font-medium">Sisa Laba KSPPG</span>
@@ -1955,9 +2032,15 @@
                         @endif
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Jumlah (Qty)</label>
-                            <input type="number" step="any" name="quantity" x-model="editPo.quantity" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                            <label class="block text-xs font-bold text-emerald-800 mb-1">Qty Gudang SBG</label>
+                            <input type="number" step="any" min="0" name="quantity_sbg" x-model="editPo.quantity_sbg" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
+                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(editPo.quantity_sbg || 0) * Number(String(editPo.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                            <label class="block text-xs font-bold text-blue-800 mb-1">Qty Gudang B</label>
+                            <input type="number" step="any" min="0" name="quantity_b" x-model="editPo.quantity_b" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
+                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(editPo.quantity_b || 0) * Number(String(editPo.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
                         </div>
                         <div>
                             <label class="block text-xs font-semibold text-[#435348] mb-1">Satuan</label>
@@ -1971,11 +2054,19 @@
                     <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">3. Rincian Harga & Margin</p>
                     <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-3 items-end">
                         @if(auth()->user()->canManageFinancials())
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Harga Supplier</label>
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                            <label class="block text-xs font-bold text-emerald-800 mb-1">Harga Supplier Gudang SBG</label>
                             <div class="relative">
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
                                 <input type="text" inputmode="decimal" name="supplier_price" x-model="editPo.supplier_price" @input="editPo.supplier_price = formatCurrencyInput($event.target)"
+                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
+                            </div>
+                        </div>
+                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                            <label class="block text-xs font-bold text-blue-800 mb-1">Harga Supplier Gudang B</label>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
+                                <input type="text" inputmode="decimal" name="supplier_price_b" x-model="editPo.supplier_price_b" @input="editPo.supplier_price_b = formatCurrencyInput($event.target)"
                                     class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
                             </div>
                         </div>
@@ -1985,7 +2076,7 @@
                             <div class="relative">
                                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
                                 <input type="text" inputmode="decimal" name="maker_price" x-model="editPo.maker_price" @input="editPo.maker_price = formatCurrencyInput($event.target)"
-                                    @if(auth()->user()->canManageFinancials()) :disabled="!hasMinimumCurrencyDigits(editPo.supplier_price)" @endif
+                                    @if(auth()->user()->canManageFinancials()) :disabled="!hasMinimumCurrencyDigits(editPo.supplier_price) && !hasMinimumCurrencyDigits(editPo.supplier_price_b)" @endif
                                     class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white disabled:bg-[#f7f7f0] disabled:text-[#687168] disabled:cursor-not-allowed">
                             </div>
                         </div>
@@ -2090,8 +2181,8 @@
                         <span class="font-black" x-text="(po.quantity || 0) + ' ' + (po.unit || '')"></span>
                     </div>
                     <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2.5">
-                        <span class="font-medium text-gray-500">Prioritas</span>
-                        <span class="font-bold" x-text="po.priority || 'Normal'"></span>
+                        <span class="font-medium text-gray-500">Harga</span>
+                        <span class="font-bold" x-text="formatRupiah(po.maker_price || 0)"></span>
                     </div>
                     <div class="flex items-center justify-between px-3 py-2.5">
                         <span class="font-medium text-gray-500">Status</span>
@@ -2194,7 +2285,7 @@
 
                                 <div class="pt-2 border-t border-[#dce1d6]">
                                     <span class="text-xs text-[#687168] font-medium block">Total Nilai</span>
-                                    <span class="text-sm font-black text-[#1c3328]" x-text="formatRupiah(item.total_supplier_price || (item.supplier_price * item.quantity))"></span>
+                                    <span class="text-sm font-black text-[#1c3328]" x-text="formatRupiah(item.total_supplier_amount ?? 0)"></span>
                                 </div>
                             </div>
                         </template>
@@ -2327,7 +2418,7 @@
                                 <span class="text-lg font-black text-amber-500" x-text="'#' + (index + 1)"></span>
                                 <div class="min-w-0">
                                     <h4 class="font-bold text-[#1c3328] text-xs sm:text-sm break-words" x-text="item.name"></h4>
-                                    <p class="text-[10px] text-[#687168] font-medium">Total KSPPG</p>
+                                    <p class="text-[10px] text-[#687168] font-medium">{{ auth()->user()->isRegularAdmin() ? 'Sisa Fee Admin / Mitra' : 'Sisa Fee KSPPG' }}</p>
                                 </div>
                             </div>
                             <span class="shrink-0 font-extrabold text-amber-600 text-xs sm:text-sm" x-text="formatRupiah(item.total)"></span>
@@ -2348,7 +2439,7 @@
                                 <span class="text-lg font-black text-[#123d2c]" x-text="'#' + (index + 1)"></span>
                                 <div class="min-w-0">
                                     <h4 class="font-bold text-[#1c3328] text-xs sm:text-sm break-words" x-text="category.name"></h4>
-                                    <p class="text-[10px] text-[#687168] font-medium">Total KSPPG</p>
+                                    <p class="text-[10px] text-[#687168] font-medium">{{ auth()->user()->isRegularAdmin() ? 'Sisa Fee Admin / Mitra' : 'Sisa Fee KSPPG' }}</p>
                                 </div>
                             </div>
                             <span class="shrink-0 font-extrabold text-[#123d2c] text-xs sm:text-sm" x-text="formatRupiah(category.total)"></span>
@@ -2430,6 +2521,61 @@
                 <button type="button" @click="open = false" class="mt-5 w-full rounded-md px-4 py-2.5 text-sm font-bold text-white {{ $popupFeedback['type'] === 'success' ? 'bg-[#123d2c] hover:bg-[#0a291e]' : 'bg-rose-600 hover:bg-rose-700' }}">Oke</button>
             </div>
         </div>
+    @endif
+    @if(auth()->user()->isSuperAdmin())
+    <div x-data="poAnalysisModal()" @open-po-analysis.window="open = true; fetchData()" x-show="open" x-cloak
+         @keydown.escape.window="open = false" class="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-3 sm:p-6">
+        <section role="dialog" aria-modal="true" aria-labelledby="po-analysis-title" @click.outside="open = false"
+                 class="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-xl bg-[#f7f7f0] p-4 sm:p-6 shadow-xl">
+            <header class="flex items-start justify-between gap-4">
+                <div><h2 id="po-analysis-title" class="text-xl font-extrabold text-[#123d2c]">Analisa PO</h2>
+                    <p class="mt-1 text-sm text-gray-600">Perubahan harga bulanan dan bulan harga terendah per barang.</p></div>
+                <button type="button" @click="open = false" class="rounded-lg border px-3 py-2" aria-label="Tutup analisa PO">✕</button>
+            </header>
+            <form @submit.prevent="fetchData()" class="my-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <label class="text-xs font-semibold">Acuan harga
+                    <select x-model="filters.source" class="mt-1 w-full rounded-md border-gray-300 text-sm"><option value="supplier_sbg">Supplier SBG</option><option value="supplier_b">Supplier B</option><option value="maker">Harga jual</option></select></label>
+                <label class="text-xs font-semibold">Kategori
+                    <select x-model="filters.category" @change="filters.item = ''" class="mt-1 w-full rounded-md border-gray-300 text-sm"><option value="">Semua kategori</option><template x-for="category in categories" :key="category"><option :value="category" x-text="category"></option></template></select></label>
+                <label class="text-xs font-semibold">Tahun
+                    <input type="number" min="2000" max="2100" required x-model="filters.year" class="mt-1 w-full rounded-md border-gray-300 text-sm"></label>
+                <label class="text-xs font-semibold">Bulan
+                    <select x-model="filters.month" class="mt-1 w-full rounded-md border-gray-300 text-sm"><option value="">Semua bulan</option><template x-for="(month, index) in months" :key="month"><option :value="index + 1" x-text="month"></option></template></select></label>
+                <label class="text-xs font-semibold">Wilayah
+                    <select x-model="filters.region" @change="filters.item = ''" class="mt-1 w-full rounded-md border-gray-300 text-sm"><option value="">Semua wilayah</option><template x-for="region in data.regions" :key="region"><option :value="region" x-text="region"></option></template></select></label>
+                <label class="text-xs font-semibold">Barang
+                    <select x-model="filters.item" class="mt-1 w-full rounded-md border-gray-300 text-sm"><option value="">Semua barang</option><template x-for="item in data.items" :key="item"><option :value="item" x-text="item"></option></template></select></label>
+                <button type="submit" class="self-end rounded-md bg-[#123d2c] px-4 py-2 text-sm font-bold text-white disabled:opacity-50" :disabled="loading">Tampilkan</button>
+            </form>
+            <p class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-relaxed text-amber-900">Harga bulanan = total (Qty × harga) ÷ total Qty. Barang dan satuan dihitung terpisah. Bulan harga rendah merupakan petunjuk dari riwayat PO, belum memastikan musim panen. Perubahan (%) dibanding bulan kalender sebelumnya; tanda — berarti data tidak tersedia.</p>
+            <p x-show="loading" class="py-5 text-sm" role="status">Memuat analisa...</p>
+            <div x-show="error" class="my-4 rounded-md bg-red-50 p-3 text-red-700" role="alert"><span x-text="error"></span> <button type="button" @click="fetchData()" class="underline">Coba lagi</button></div>
+            <div x-show="!loading && !error" class="mt-5 space-y-4">
+                <p class="text-xs text-gray-600" x-text="data.rows.length + ' kelompok barang · ' + data.excluded + ' PO tanpa Qty/harga positif tidak dihitung.'"></p>
+                <p x-show="data.rows.length === 0" class="rounded-lg border bg-white p-6 text-center text-sm text-gray-600">Belum ada data harga untuk filter ini. Coba ganti tahun, kategori, atau acuan harga.</p>
+                <template x-for="row in data.rows" :key="JSON.stringify([row.item,row.category,row.unit])">
+                    <article class="rounded-xl border border-[#dce1d6] bg-white p-4">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div><h3 class="font-extrabold text-[#123d2c]" x-text="row.item"></h3><p class="text-xs text-gray-500" x-text="(row.category || 'Tanpa kategori') + ' · per ' + row.unit + ' · ' + row.count + ' PO / ' + row.observed_months + ' bulan pada ' + data.year"></p></div>
+                            <div class="text-xs text-right"><p class="font-bold text-emerald-800" x-text="row.observed_months > 1 ? 'Bulan harga terendah: ' + row.lowest_months.map(m => months[m-1]).join(', ') : 'Data baru 1 bulan; pola belum terlihat'"></p><p class="mt-1 text-gray-600" x-text="'Rentang rata-rata: ' + rupiah(row.lowest) + ' – ' + rupiah(row.highest)"></p></div>
+                        </div>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="w-full text-xs text-left"><thead><tr class="border-b text-gray-500"><th class="p-2">Bulan</th><th class="p-2">Rata-rata harga</th><th class="p-2">Perubahan</th><th class="p-2">Harga min–maks</th><th class="p-2">Qty / PO</th><th class="p-2 min-w-[140px]">Tren harga</th></tr></thead>
+                                <tbody><template x-for="month in visibleMonths(row)" :key="month.month"><tr class="border-b border-gray-100">
+                                    <td class="p-2 font-semibold" x-text="months[month.month-1]"></td>
+                                    <td class="p-2 whitespace-nowrap" x-text="month.average === null ? '—' : rupiah(month.average)"></td>
+                                    <td class="p-2 whitespace-nowrap" :class="month.change > 0 ? 'text-red-700' : month.change < 0 ? 'text-emerald-700' : 'text-gray-500'" x-text="month.change === null ? '—' : (month.change > 0 ? '+' : '') + month.change.toLocaleString('id-ID') + '%'"></td>
+                                    <td class="p-2 whitespace-nowrap" x-text="month.min === null ? '—' : rupiah(month.min) + ' – ' + rupiah(month.max)"></td>
+                                    <td class="p-2 whitespace-nowrap" x-text="month.count ? month.quantity.toLocaleString('id-ID') + ' ' + row.unit + ' / ' + month.count : '—'"></td>
+                                    <td class="p-2"><div class="h-3 rounded bg-gray-100"><div class="h-3 rounded bg-emerald-600" :style="{width: (month.average === null ? 0 : month.average / row.highest * 100) + '%'}"></div></div></td>
+                                </tr></template></tbody>
+                            </table>
+                        </div>
+                    </article>
+                </template>
+            </div>
+        </section>
+    </div>
     @endif
 </body>
 </html>

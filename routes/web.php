@@ -48,6 +48,7 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/account/password', [DashboardController::class, 'updateOwnPassword'])
         ->name('account.password.update');
     Route::delete('/region/{id}', [DashboardController::class, 'destroyRegion'])->name('admin.region.destroy');
+    Route::get('/dashboard/analisa-po', [DashboardController::class, 'getPoAnalysis'])->name('dashboard.po-analysis');
     Route::get('/dashboard/analisa-keuntungan', [DashboardController::class, 'getAnalisaKeuntungan'])->name('dashboard.analisa');
     Route::get('/dashboard/reset', [DashboardController::class, 'resetFilter'])->name('dashboard.reset');
     Route::post('/dashboard/po', [DashboardController::class, 'store'])->name('dashboard.po.store');

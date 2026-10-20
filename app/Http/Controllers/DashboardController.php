@@ -201,11 +201,14 @@ class DashboardController extends Controller
         }
 
         $this->normalizeCurrencyInputs($request);
+        $this->normalizeWarehouseQuantities($request);
 
         $validated = $request->validate([
             'item_name'        => 'required|string|max:255',
             'category'         => 'required|string|in:Karbo,Protein Nabati,Protein Hewani,Sayur,Buah',
-            'quantity'         => 'required|numeric|min:0.01',
+            'quantity'         => 'required|numeric|min:0.01|max:99999999.99',
+            'quantity_sbg'     => 'sometimes|required|numeric|min:0|max:99999999.99',
+            'quantity_b'       => 'sometimes|required|numeric|min:0|max:99999999.99',
             'unit'             => 'required|string|max:50',
             'transaction_date' => 'required|date',
             'created_by'       => 'required|integer|exists:users,id',
@@ -213,6 +216,7 @@ class DashboardController extends Controller
             'status_stage'     => 'required|string|in:Cari Supplier,Sortir,Pengiriman,Selesai,Retur,Kekurangan,Perubahan Item',
             'supplier_name'    => 'nullable|string|max:255',
             'supplier_price'   => 'nullable|numeric|min:0',
+            'supplier_price_b' => 'nullable|numeric|min:0',
             'maker_price'      => 'nullable|numeric|min:0',
             'partner_margin'   => 'nullable|numeric|min:0',
             'region'           => 'nullable|exists:regions,name',
@@ -227,7 +231,7 @@ class DashboardController extends Controller
         // Harga supplier hanya boleh ditentukan oleh super admin. Jangan percaya
         // atribut readonly di browser karena request masih dapat dimanipulasi.
         if ($user->isRegularAdmin()) {
-            unset($validated['supplier_price']);
+            unset($validated['supplier_price'], $validated['supplier_price_b']);
             unset($validated['supplier_name']);
         }
 
@@ -356,11 +360,14 @@ class DashboardController extends Controller
         }
 
         $this->normalizeCurrencyInputs($request);
+        $this->normalizeWarehouseQuantities($request);
 
         $validated = $request->validate([
             'item_name'        => 'required|string|max:255',
             'category'         => 'required|string|in:Karbo,Protein Nabati,Protein Hewani,Sayur,Buah',
-            'quantity'         => 'required|numeric|min:0.01',
+            'quantity'         => 'required|numeric|min:0.01|max:99999999.99',
+            'quantity_sbg'     => 'sometimes|required|numeric|min:0|max:99999999.99',
+            'quantity_b'       => 'sometimes|required|numeric|min:0|max:99999999.99',
             'unit'             => 'required|string|max:50',
             'transaction_date' => 'required|date',
             'created_by'       => 'required|integer|exists:users,id',
@@ -368,6 +375,7 @@ class DashboardController extends Controller
             'status_stage'     => 'required|string|in:Cari Supplier,Sortir,Pengiriman,Selesai,Retur,Kekurangan,Perubahan Item',
             'supplier_name'    => 'nullable|string|max:255',
             'supplier_price'   => 'nullable|numeric|min:0',
+            'supplier_price_b' => 'nullable|numeric|min:0',
             'maker_price'      => 'nullable|numeric|min:0',
             'partner_margin'   => 'nullable|numeric|min:0',
             'notes'            => 'nullable|string',
@@ -379,7 +387,7 @@ class DashboardController extends Controller
         // Pertahankan harga lama ketika perubahan dilakukan oleh admin biasa,
         // termasuk jika request dikirim langsung di luar form dashboard.
         if ($user->isRegularAdmin()) {
-            unset($validated['supplier_price']);
+            unset($validated['supplier_price'], $validated['supplier_price_b']);
             unset($validated['supplier_name']);
         }
 
@@ -645,15 +653,25 @@ class DashboardController extends Controller
         return $admin;
     }
 
-    /**
-     * Ubah format Rupiah Indonesia (contoh: 13.500,50) menjadi angka
-     * yang dapat divalidasi dan disimpan ke database.
-     */
+    private function normalizeWarehouseQuantities(Request $request): void
+    {
+        if (!$request->hasAny(['quantity_sbg', 'quantity_b'])) {
+            return;
+        }
+
+        $quantities = $request->validate([
+            'quantity_sbg' => 'required|numeric|min:0|max:99999999.99|decimal:0,2',
+            'quantity_b' => 'required|numeric|min:0|max:99999999.99|decimal:0,2',
+        ]);
+
+        $request->merge(['quantity' => round($quantities['quantity_sbg'] + $quantities['quantity_b'], 2)]);
+    }
+
     private function normalizeCurrencyInputs(Request $request): void
     {
         $normalized = [];
 
-        foreach (['supplier_price', 'maker_price', 'partner_margin'] as $field) {
+        foreach (['supplier_price', 'supplier_price_b', 'maker_price', 'partner_margin'] as $field) {
             $value = $request->input($field);
 
             if (is_string($value) && $value !== '') {
@@ -662,6 +680,98 @@ class DashboardController extends Controller
         }
 
         $request->merge($normalized);
+    }
+
+    public function getPoAnalysis(Request $request)
+    {
+        abort_unless($request->user()->isSuperAdmin(), 403);
+        $filters = $request->validate([
+            'year' => 'sometimes|integer|min:2000|max:2100',
+            'month' => 'nullable|integer|min:1|max:12',
+            'category' => 'nullable|string|in:Karbo,Protein Nabati,Protein Hewani,Sayur,Buah',
+            'source' => 'sometimes|in:supplier_sbg,supplier_b,maker',
+            'region' => 'nullable|string|max:255',
+            'item' => 'nullable|string|max:255',
+        ]);
+        $year = (int) ($filters['year'] ?? today()->year);
+        $source = $filters['source'] ?? 'supplier_sbg';
+        $query = PurchaseOrder::query()
+            ->whereBetween('transaction_date', [$year.'-01-01', $year.'-12-31'])
+            ->whereDate('transaction_date', '<=', today());
+        foreach (['category', 'region'] as $field) {
+            if (!empty($filters[$field])) {
+                $query->where($field, $filters[$field]);
+            }
+        }
+        $items = (clone $query)->distinct()->orderBy('item_name')->pluck('item_name');
+        if (!empty($filters['item'])) {
+            $query->where('item_name', $filters['item']);
+        }
+        $groups = [];
+        $excluded = 0;
+        foreach ($query->select(['item_name', 'category', 'unit', 'transaction_date', 'quantity', 'quantity_sbg', 'quantity_b', 'supplier_price', 'supplier_price_b', 'maker_price'])->cursor() as $po) {
+            $quantity = match ($source) {
+                'supplier_sbg' => $po->quantity_sbg ?? $po->quantity,
+                'supplier_b' => $po->quantity_b ?? 0,
+                default => $po->quantity,
+            };
+            $price = match ($source) {
+                'supplier_sbg' => $po->supplier_price,
+                'supplier_b' => $po->supplier_price_b ?? $po->supplier_price,
+                default => $po->maker_price,
+            };
+            if ($quantity <= 0 || $price <= 0) {
+                $excluded++;
+                continue;
+            }
+            $key = json_encode([$po->item_name, $po->category, $po->unit]);
+            if (!isset($groups[$key])) {
+                $groups[$key] = ['item' => $po->item_name, 'category' => $po->category, 'unit' => $po->unit, 'buckets' => []];
+            }
+            $month = (int) $po->transaction_date->month;
+            $bucket = $groups[$key]['buckets'][$month] ?? ['value' => 0, 'quantity' => 0, 'count' => 0, 'min' => $price, 'max' => $price];
+            $bucket['value'] += $price * $quantity;
+            $bucket['quantity'] += $quantity;
+            $bucket['count']++;
+            $bucket['min'] = min($bucket['min'], $price);
+            $bucket['max'] = max($bucket['max'], $price);
+            $groups[$key]['buckets'][$month] = $bucket;
+        }
+        $rows = [];
+        foreach ($groups as $group) {
+            $months = [];
+            for ($month = 1; $month <= 12; $month++) {
+                $bucket = $group['buckets'][$month] ?? null;
+                $average = $bucket ? $bucket['value'] / $bucket['quantity'] : null;
+                $previous = $months[$month - 2]['average'] ?? null;
+                $months[] = [
+                    'month' => $month, 'average' => $average === null ? null : round($average, 2),
+                    'change' => $average !== null && $previous !== null && $previous > 0 ? round(($average - $previous) / $previous * 100, 2) : null,
+                    'quantity' => $bucket['quantity'] ?? 0, 'count' => $bucket['count'] ?? 0,
+                    'min' => $bucket['min'] ?? null, 'max' => $bucket['max'] ?? null,
+                ];
+            }
+            $available = array_values(array_filter($months, fn ($month) => $month['average'] !== null));
+            $lowest = min(array_column($available, 'average'));
+            $highest = max(array_column($available, 'average'));
+            $selectedMonth = (int) ($filters['month'] ?? 0);
+            if ($selectedMonth && $months[$selectedMonth - 1]['average'] === null) {
+                continue;
+            }
+            $rows[] = [
+                'item' => $group['item'], 'category' => $group['category'], 'unit' => $group['unit'],
+                'months' => $months, 'observed_months' => count($available),
+                'lowest' => $lowest, 'highest' => $highest,
+                'lowest_months' => array_column(array_filter($available, fn ($month) => $month['average'] === $lowest), 'month'),
+                'count' => array_sum(array_column($available, 'count')),
+            ];
+        }
+        usort($rows, fn ($a, $b) => [$a['item'], $a['unit']] <=> [$b['item'], $b['unit']]);
+        return response()->json([
+            'rows' => $rows, 'items' => $items, 'year' => $year, 'source' => $source,
+            'excluded' => $excluded,
+            'regions' => PurchaseOrder::query()->distinct()->orderBy('region')->pluck('region'),
+        ]);
     }
 
     public function getAnalisaKeuntungan(Request $request)
@@ -697,22 +807,25 @@ class DashboardController extends Controller
                 ->whereDate('transaction_date', '<=', today()->toDateString());
         }
 
-        // Rumus ini sama dengan accessor PurchaseOrder::total_ksppg_fee.
-        // total_ksppg_fee adalah atribut model, bukan kolom database.
-        $totalKsppg = 'SUM(CASE WHEN COALESCE(supplier_price, 0) = 0 THEN 0 ELSE quantity * (COALESCE(maker_price, 0) - supplier_price - COALESCE(partner_margin, 0)) END)';
+        // Gunakan sumber fee dan status belum lunas yang sama dengan kartu dashboard.
+        $isAdmin = $user->isRegularAdmin();
+        $query->where($isAdmin ? 'is_partner_fee_paid' : 'is_ksppg_fee_paid', false);
+        $totalFee = $isAdmin
+            ? 'SUM(COALESCE(quantity_sbg, quantity) * COALESCE(partner_margin, 0) + COALESCE(quantity_b, 0) * COALESCE(maker_price, 0))'
+            : 'SUM(CASE WHEN COALESCE(supplier_price, 0) = 0 THEN 0 ELSE COALESCE(quantity_sbg, quantity) * (COALESCE(maker_price, 0) - supplier_price - COALESCE(partner_margin, 0)) END)';
 
         $topItems = (clone $query)
-            ->select('item_name', DB::raw($totalKsppg.' as total_ksppg'))
+            ->select('item_name', DB::raw($totalFee.' as total_fee'))
             ->groupBy('item_name')
-            ->orderByDesc('total_ksppg')
+            ->orderByDesc('total_fee')
             ->orderBy('item_name')
             ->limit(3)
             ->get();
 
         $topCategories = (clone $query)
-            ->select('category', DB::raw($totalKsppg.' as total_ksppg'))
+            ->select('category', DB::raw($totalFee.' as total_fee'))
             ->groupBy('category')
-            ->orderByDesc('total_ksppg')
+            ->orderByDesc('total_fee')
             ->orderBy('category')
             ->limit(3)
             ->get();
@@ -720,9 +833,9 @@ class DashboardController extends Controller
         $bestItem = $topItems->first();
 
         $worstItem = (clone $query)
-            ->select('item_name', DB::raw($totalKsppg.' as total_ksppg'))
+            ->select('item_name', DB::raw($totalFee.' as total_fee'))
             ->groupBy('item_name')
-            ->orderByRaw($totalKsppg.' ASC')
+            ->orderByRaw($totalFee.' ASC')
             ->orderBy('item_name')
             ->first();
 
@@ -730,27 +843,27 @@ class DashboardController extends Controller
         return response()->json([
             'topItems' => $topItems->map(fn ($item) => [
                 'name' => $item->item_name,
-                'total' => (float) $item->total_ksppg,
+                'total' => (float) $item->total_fee,
             ])->values(),
             'topCategories' => $topCategories->map(fn ($category) => [
                 'name' => $category->category ?: 'Tanpa Kategori',
-                'total' => (float) $category->total_ksppg,
+                'total' => (float) $category->total_fee,
             ])->values(),
             'topItem' => [
                 'name'  => $bestItem->item_name ?? '-',
-                'total' => (float) ($bestItem->total_ksppg ?? 0),
+                'total' => (float) ($bestItem->total_fee ?? 0),
             ],
             'topCategory' => [
                 'name'  => $topCategories->first()?->category ?: '-',
-                'total' => (float) ($topCategories->first()?->total_ksppg ?? 0),
+                'total' => (float) ($topCategories->first()?->total_fee ?? 0),
             ],
             'bestItem' => [
                 'name'  => $bestItem->item_name ?? '-',
-                'total' => (float) ($bestItem->total_ksppg ?? 0),
+                'total' => (float) ($bestItem->total_fee ?? 0),
             ],
             'worstItem' => [
                 'name'  => $worstItem->item_name ?? '-',
-                'total' => (float) ($worstItem->total_ksppg ?? 0),
+                'total' => (float) ($worstItem->total_fee ?? 0),
             ],
         ]);
     }

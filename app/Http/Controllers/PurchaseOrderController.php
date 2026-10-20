@@ -66,8 +66,8 @@ class PurchaseOrderController extends Controller
         $poSelesaiCount = $purchaseOrders->where('status_stage', 'Selesai')->count();
 
         // Fee Mitra, Supplier, dan KSPPG
-        $totalFeeMitra      = $purchaseOrders->sum(fn($po) => $po->quantity * ($po->partner_margin ?? 0));
-        $totalBayarSupplier = $purchaseOrders->sum(fn($po) => $po->quantity * ($po->supplier_price ?? 0));
+        $totalFeeMitra      = $purchaseOrders->sum('total_partner_fee');
+        $totalBayarSupplier = $purchaseOrders->sum('total_supplier_amount');
         $totalFeeKSPPG      = $purchaseOrders->sum('total_ksppg_fee');
 
         // -----------------------------------------------------------------

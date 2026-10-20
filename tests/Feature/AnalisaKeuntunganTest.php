@@ -53,7 +53,7 @@ class AnalisaKeuntunganTest extends TestCase
             $this->actingAs($own)->getJson(route('dashboard.analisa', ['filter' => 'all']))
                 ->assertOk()
                 ->assertJsonPath('topItem.name', 'Beras')
-                ->assertJsonPath('topItem.total', 10000);
+                ->assertJsonPath('topItem.total', 4000);
         } finally {
             Carbon::setTestNow();
         }
@@ -87,6 +87,73 @@ class AnalisaKeuntunganTest extends TestCase
         } finally {
             Carbon::setTestNow();
         }
+    }
+
+    public function test_analysis_uses_role_fee_and_its_payment_status(): void
+    {
+        PurchaseOrder::create([
+            'po_number' => 'ROLE-FEE', 'item_name' => 'Buah', 'category' => 'Buah',
+            'transaction_date' => today(), 'quantity_sbg' => 2, 'quantity_b' => 3,
+            'maker_price' => 10000, 'supplier_price' => 6000, 'partner_margin' => 1000,
+            'region' => 'Garut',
+        ]);
+        foreach (['admin' => 32000, 'super_admin' => 6000, 'kepala_dapur' => 6000] as $role => $expected) {
+            $user = User::factory()->create(['role' => $role, 'region' => 'Garut']);
+            $this->actingAs($user)->getJson(route('dashboard.analisa', ['filter' => 'all']))
+                ->assertOk()->assertJsonPath('topItem.total', $expected)
+                ->assertJsonPath('topCategory.total', $expected)
+                ->assertJsonPath('worstItem.total', $expected);
+        }
+        PurchaseOrder::where('po_number', 'ROLE-FEE')->update(['is_partner_fee_paid' => true]);
+        $this->actingAs(User::factory()->create(['role' => 'admin', 'region' => 'Garut']))
+            ->getJson(route('dashboard.analisa', ['filter' => 'all']))->assertOk()->assertJsonCount(0, 'topItems');
+        $this->actingAs(User::factory()->create(['role' => 'kepala_dapur', 'region' => 'Garut']))
+            ->getJson(route('dashboard.analisa', ['filter' => 'all']))->assertOk()->assertJsonPath('topItem.total', 6000);
+        PurchaseOrder::where('po_number', 'ROLE-FEE')->update(['is_ksppg_fee_paid' => true]);
+        $this->getJson(route('dashboard.analisa', ['filter' => 'all']))->assertOk()->assertJsonCount(0, 'topItems');
+    }
+
+    public function test_po_analysis_is_only_available_to_super_admin(): void
+    {
+        foreach (['admin', 'kepala_dapur'] as $role) {
+            $this->actingAs(User::factory()->create(['role' => $role]))
+                ->getJson(route('dashboard.po-analysis'))->assertForbidden();
+        }
+    }
+
+    public function test_po_analysis_weights_prices_and_keeps_units_separate(): void
+    {
+        $this->actingAs(User::factory()->create(['role' => 'super_admin']));
+        foreach ([['A', '2025-01-10', 10, 100], ['B', '2025-01-20', 30, 200], ['C', '2025-02-10', 5, 350], ['D', '2025-04-10', 5, 100]] as [$number, $date, $qty, $price]) {
+            PurchaseOrder::create([
+                'po_number' => $number, 'item_name' => 'Semangka', 'category' => 'Buah', 'unit' => 'Kg',
+                'transaction_date' => $date, 'quantity_sbg' => $qty, 'quantity_b' => 2,
+                'supplier_price' => $price, 'supplier_price_b' => 500, 'maker_price' => 1000, 'region' => 'Garut',
+            ]);
+        }
+        PurchaseOrder::create([
+            'po_number' => 'OTHER-UNIT', 'item_name' => 'Semangka', 'category' => 'Buah', 'unit' => 'Pcs',
+            'transaction_date' => '2025-01-10', 'quantity' => 1, 'supplier_price' => 999, 'region' => 'Garut',
+        ]);
+        $url = route('dashboard.po-analysis', ['year' => 2025, 'category' => 'Buah', 'region' => 'Garut']);
+        $this->getJson($url)->assertOk()->assertJsonCount(2, 'rows')
+            ->assertJsonPath('rows.0.unit', 'Kg')
+            ->assertJsonPath('rows.0.months.0.average', 175)
+            ->assertJsonPath('rows.0.months.0.quantity', 40)
+            ->assertJsonPath('rows.0.months.1.change', 100)
+            ->assertJsonPath('rows.0.months.2.average', null)
+            ->assertJsonPath('rows.0.months.3.change', null)
+            ->assertJsonPath('rows.0.lowest_months', [4]);
+        $this->getJson($url.'&source=supplier_b')->assertOk()->assertJsonCount(1, 'rows')
+            ->assertJsonPath('rows.0.months.0.average', 500)->assertJsonPath('excluded', 1);
+        $this->getJson($url.'&source=maker')->assertOk()->assertJsonPath('rows.0.months.0.average', 1000);
+        $this->getJson($url.'&month=2')->assertOk()->assertJsonCount(1, 'rows');
+        $this->getJson($url.'&month=3')->assertOk()->assertJsonCount(0, 'rows');
+        $this->getJson($url.'&item=TidakAda')->assertOk()->assertJsonCount(0, 'rows');
+        $this->getJson(route('dashboard.po-analysis', ['year' => 2025, 'category' => 'Sayur']))->assertOk()->assertJsonCount(0, 'rows');
+        $this->getJson(route('dashboard.po-analysis', ['year' => 2025, 'region' => 'Bandung']))->assertOk()->assertJsonCount(0, 'rows');
+        $this->getJson(route('dashboard.po-analysis', ['source' => 'invalid']))->assertUnprocessable();
+        $this->getJson(route('dashboard.po-analysis', ['month' => 13]))->assertUnprocessable();
     }
 
     private function order(string $number, string $item, string $category, string $date, float $quantity, float $maker, float $supplier, float $partner): void

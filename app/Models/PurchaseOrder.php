@@ -21,6 +21,8 @@ class PurchaseOrder extends Model
         'item_name',
         'category',
         'quantity',
+        'quantity_sbg',
+        'quantity_b',
         'unit',
         'transaction_date',
         'priority',
@@ -28,7 +30,8 @@ class PurchaseOrder extends Model
         'supplier_name',
         'region',
         'created_by',
-        'supplier_price',
+        'supplier_price', // Harga supplier gudang SBG
+        'supplier_price_b',
         'maker_price',
         'partner_margin',
         'is_partner_fee_paid',
@@ -43,7 +46,10 @@ class PurchaseOrder extends Model
     protected $casts = [
         'transaction_date'    => 'date',
         'quantity'            => 'float',
+        'quantity_sbg'        => 'float',
+        'quantity_b'          => 'float',
         'supplier_price'      => 'float',
+        'supplier_price_b'    => 'float',
         'maker_price'         => 'float',
         'partner_margin'      => 'float',
         'is_partner_fee_paid' => 'boolean',
@@ -62,6 +68,15 @@ class PurchaseOrder extends Model
         'ksppg_margin_per_unit',
         'verification_url',
     ];
+
+    protected static function booted(): void
+    {
+        static::saving(function (PurchaseOrder $order) {
+            if ($order->quantity_sbg !== null) {
+                $order->quantity = $order->quantity_sbg + ($order->quantity_b ?? 0);
+            }
+        });
+    }
 
     /* -------------------------------------------------------------------------- */
     /*                                 RELASI                                     */
@@ -104,28 +119,29 @@ class PurchaseOrder extends Model
 
     /**
      * Total Bayar Supplier.
-     * Rumus: Qty * Harga Supplier
+     * Rumus: Qty SBG * Harga Supplier SBG
      */
     public function getTotalSupplierAmountAttribute()
     {
-        return $this->quantity * $this->supplier_price;
+        return ($this->quantity_sbg ?? $this->quantity) * $this->supplier_price;
     }
 
     /**
      * Total Laba Mitra.
-     * Rumus: Qty * Laba Mitra per unit
+     * Rumus: (Qty SBG * Fee Mitra) + (Qty B * Harga Maker)
      */
     public function getTotalPartnerFeeAttribute()
     {
-        return $this->quantity * $this->partner_margin;
+        return ($this->quantity_sbg ?? $this->quantity) * $this->partner_margin
+            + ($this->quantity_b ?? 0) * $this->maker_price;
     }
 
     /**
      * Total Laba KSPPG.
-     * Rumus: Qty * Laba KSPPG per unit
+     * Rumus: Qty SBG * Laba KSPPG per unit
      */
     public function getTotalKsppgFeeAttribute()
     {
-        return $this->quantity * $this->ksppg_margin_per_unit;
+        return ($this->quantity_sbg ?? $this->quantity) * $this->ksppg_margin_per_unit;
     }
 }

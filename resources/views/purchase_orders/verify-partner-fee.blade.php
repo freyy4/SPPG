@@ -43,7 +43,7 @@
                                 <dd class="mt-0.5 font-bold">{{ $purchaseOrder->transaction_date?->translatedFormat('d F Y') ?? '-' }}</dd>
                             </div>
                             <div>
-                                <dt class="text-gray-400">Harga Item</dt>
+                                <dt class="text-gray-400">Harga</dt>
                                 <dd class="mt-0.5 font-bold text-gray-900">Rp {{ number_format($purchaseOrder->maker_price ?? 0, 0, ',', '.') }}</dd>
                             </div>
                             <div class="text-right">
