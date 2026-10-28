@@ -1,5 +1,5 @@
 <div x-cloak x-show="navOpen" class="sbg-nav-backdrop" @click="navOpen = false"></div>
-<aside id="sbg-sidebar" class="sbg-sidebar" :class="navOpen ? 'is-open' : ''" @keydown.escape.window="navOpen = false">
+<aside id="sbg-sidebar" :inert="!navOpen && !desktopNav" class="sbg-sidebar" :class="navOpen ? 'is-open' : ''" @keydown.escape.window="navOpen = false">
     <a href="{{ route('dashboard') }}" class="sbg-brand"><img src="{{ asset('favicon.svg') }}" alt="" width="38" height="38"><strong>Sentra Buah Garut<small>SISTEM PURCHASE ORDER</small></strong></a>
     <p class="sbg-nav-caption">WORKSPACE</p>
     <nav aria-label="Navigasi utama">

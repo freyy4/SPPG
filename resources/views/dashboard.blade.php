@@ -356,6 +356,7 @@
             navOpen: false, mobilePage: location.hash === '#data-po' ? 'orders' : 'home',
             filterOpen: @json($errors->has('date_from') || $errors->has('date_to')),
             wideFilters: window.matchMedia('(min-width: 768px)').matches,
+            desktopNav: window.matchMedia('(min-width: 1280px)').matches,
             detailLoading: false, detailError: '', detailRequest: 0,
             poView: window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table',
             activeView: location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard',
@@ -625,7 +626,7 @@
     <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v={{ filemtime(public_path('css/sbg-v2.css')) }}">
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
-<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" :class="'sbg-page-' + mobilePage" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); focusPoSearch(); }">
+<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" :class="'sbg-page-' + mobilePage" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1280px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); focusPoSearch(); }">
 
     @include('components.sbg.app-navigation')
 
