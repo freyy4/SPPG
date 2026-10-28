@@ -28,11 +28,10 @@ class CompactPurchaseOrderWorkspaceTest extends TestCase
             ]);
         });
         $response = $this->get(route('dashboard'));
-        $response->assertOk()->assertViewHas('summary', fn ($summary) =>
-            $summary['total_nilai_po'] === 215160000.0 && $summary['po_pending'] === 2 && $summary['po_selesai'] === 2);
+        $response->assertOk()->assertViewHas('summary', fn ($summary) => $summary['total_nilai_po'] === 215160000.0 && $summary['po_pending'] === 2 && $summary['po_selesai'] === 2);
 
         if ($directory = getenv('SBG_BROWSER_FIXTURES')) {
-            if (!is_dir($directory)) {
+            if (! is_dir($directory)) {
                 mkdir($directory, 0755, true);
             }
             file_put_contents($directory.'/dashboard.html', $response->getContent());

@@ -232,6 +232,7 @@ try {
         await page.locator('#po-filter-options').waitFor({state:'hidden'});
         assert.equal(await page.locator('.sbg-filter-toggle').evaluate(e=>e===document.activeElement),true);
         await page.locator('.sbg-bottom-nav button').click();
+        await page.waitForTimeout(260);
         await page.screenshot({path:path.join(output,'drawer-390.png')});
         assert.equal(await page.locator('#sbg-sidebar').evaluate(e=>e.inert),false);
         await page.keyboard.press('Escape');
