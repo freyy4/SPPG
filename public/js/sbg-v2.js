@@ -5,14 +5,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const targets = element => [...element.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled):not([type=hidden]), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')].filter(item => visible(item) && !item.closest('[inert]'));
     const dialogScope = dialog => [...dialog.querySelectorAll('[role=dialog], [role=alertdialog]')].filter(visible).at(-1) || dialog;
 
-    dialogs.forEach(dialog => {
+    dialogs.forEach((dialog, index) => {
         if (dialog.classList.contains('sbg-modal')) {
             dialog.setAttribute('role', dialog.getAttribute('role') || 'dialog');
             dialog.setAttribute('aria-modal', 'true');
             if (!dialog.hasAttribute('aria-label') && !dialog.hasAttribute('aria-labelledby')) {
-                dialog.setAttribute('aria-label', dialog.querySelector('h2,h3,h4')?.textContent.trim() || 'Dialog');
+                const heading = dialog.querySelector('h2,h3,h4');
+                if (heading) {
+                    heading.id ||= `sbg-dialog-title-${index}`;
+                    dialog.setAttribute('aria-labelledby', heading.id);
+                } else dialog.setAttribute('aria-label', 'Dialog');
             }
         }
+        dialog.querySelectorAll('button').forEach(button => {
+            if (!button.textContent.trim() && button.querySelector('svg') && /false/.test(button.getAttribute('@click') || '')) {
+                button.setAttribute('aria-label', button.getAttribute('aria-label') || 'Tutup dialog');
+                button.setAttribute('data-dialog-close', '');
+                button.classList.add('sbg-icon-button');
+            }
+        });
         let opener;
         const sync = () => {
             const opened = dialog.getAttribute('aria-modal') === 'true' && visible(dialog);
@@ -38,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dialog) return;
         const scope = dialogScope(dialog);
         if (event.key === 'Escape' && scope === dialog) {
-            const close = dialog.querySelector('[data-dialog-close]') || [...dialog.querySelectorAll('button')].find(button => /false/.test(button.getAttribute('@click') || '') && button.textContent.trim() === '×');
+            const close = dialog.querySelector('[data-dialog-close]') || [...dialog.querySelectorAll('button')].find(button => /false/.test(button.getAttribute('@click') || '') && /^(×|Tutup|Batal)$/.test(button.textContent.trim()));
             close?.click();
         }
         if (event.key !== 'Tab') return;

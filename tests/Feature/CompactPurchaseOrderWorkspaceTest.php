@@ -15,11 +15,12 @@ class CompactPurchaseOrderWorkspaceTest extends TestCase
     {
         $this->travelTo(now()->setDate(2026, 10, 28)->setTime(10, 0));
         $this->actingAs(User::factory()->create(['name' => 'Super Admin', 'role' => 'super_admin', 'region' => 'Pusat']));
+        $empty = $this->get(route('dashboard'))->assertOk()->assertViewHas('summary', fn ($summary) => $summary['total_po'] === 0 && $summary['total_nilai_po'] == 0);
         $orders = collect(['Semangka', 'Pisang Cavendish', 'Mangga Harum Manis', 'Alpukat Mentega', 'Apel Fuji', 'Pear Century'])->map(function ($name, $index) {
             return PurchaseOrder::create([
                 'po_number' => 'PO-20261028-'.(50 + $index).'HS', 'item_name' => $name,
                 'category' => 'Buah', 'quantity_sbg' => 105, 'quantity_b' => 5,
-                'unit' => 'Kg', 'maker_price' => 16000, 'supplier_price' => 10000,
+                'unit' => 'Kg', 'maker_price' => 326000, 'supplier_price' => 10000,
                 'supplier_price_b' => 9000, 'partner_margin' => 2000,
                 'transaction_date' => '2026-10-28', 'region' => 'Pusat',
                 'status_stage' => ['Selesai', 'Proses', 'Pending'][$index % 3],
@@ -28,13 +29,14 @@ class CompactPurchaseOrderWorkspaceTest extends TestCase
         });
         $response = $this->get(route('dashboard'));
         $response->assertOk()->assertViewHas('summary', fn ($summary) =>
-            $summary['total_nilai_po'] === 10560000.0 && $summary['po_pending'] === 2 && $summary['po_selesai'] === 2);
+            $summary['total_nilai_po'] === 215160000.0 && $summary['po_pending'] === 2 && $summary['po_selesai'] === 2);
 
         if ($directory = getenv('SBG_BROWSER_FIXTURES')) {
             if (!is_dir($directory)) {
                 mkdir($directory, 0755, true);
             }
             file_put_contents($directory.'/dashboard.html', $response->getContent());
+            file_put_contents($directory.'/empty.html', $empty->getContent());
             file_put_contents($directory.'/orders.json', $orders->mapWithKeys(fn ($order) => [
                 $order->id => $this->getJson(route('dashboard.po.show', $order))->json(),
             ])->toJson());
