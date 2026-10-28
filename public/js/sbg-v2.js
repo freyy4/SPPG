@@ -32,12 +32,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 opener = document.activeElement;
                 stack.push(dialog);
                 dialog.tabIndex = -1;
-                dialog.focus({preventScroll:true});
+                (dialog.querySelector('[data-dialog-initial-focus]') || dialog).focus({preventScroll:true});
             } else if (!opened && index !== -1) {
                 stack.splice(index, 1);
                 const current = stack.at(-1);
                 if (current) current.focus({preventScroll:true});
-                else if (opener?.isConnected && visible(opener)) opener.focus({preventScroll:true});
+                else if (opener?.isConnected && visible(opener) && !opener.closest('[inert]')) opener.focus({preventScroll:true});
+                else {
+                    // A menu/drawer trigger may have hidden itself while opening.
+                    const fallback = opener?.closest('.sbg-account')?.querySelector('.sbg-account-toggle')
+                        || [...document.querySelectorAll('.sbg-menu-toggle, .sbg-bottom-nav button')].find(visible);
+                    fallback?.focus({preventScroll:true});
+                }
             }
             document.body.classList.toggle('sbg-scroll-locked', stack.length > 0);
         };
@@ -81,6 +87,76 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
+    document.querySelectorAll('[data-sbg-logout]').forEach(form => {
+        form.addEventListener('submit', event => {
+            if (form.dataset.submitting) { event.preventDefault(); return; }
+            form.dataset.submitting = 'true';
+            const button = form.querySelector('button[type=submit]');
+            button.disabled = true;
+            button.setAttribute('aria-busy', 'true');
+        });
+    });
+
+    document.querySelectorAll('[data-sbg-create-form]').forEach(form => {
+        const fields = [...form.querySelectorAll('input:not([type=hidden]), select, textarea')];
+        let serverErrors = {};
+        try { serverErrors = JSON.parse(form.dataset.serverErrors || '{}'); } catch (_) { /* Empty validation bag. */ }
+        const errors = new Map();
+        fields.forEach(field => {
+            field.id ||= `sbg-create-${field.name}`;
+            let container = field.parentElement;
+            while (container && container !== form && !container.querySelector(':scope > label')) container = container.parentElement;
+            const label = container?.querySelector(':scope > label');
+            if (label) label.htmlFor = field.id;
+            const error = document.createElement('p');
+            error.id = `${field.id}-error`;
+            error.className = 'sbg-create-error';
+            error.setAttribute('role', 'alert');
+            field.setAttribute('aria-describedby', error.id);
+            (field.parentElement.classList.contains('relative') ? field.parentElement : field).after(error);
+            error.textContent = (serverErrors[field.name] || (field.name === 'quantity_sbg' ? serverErrors.quantity : []) || [])[0] || '';
+            field.setAttribute('aria-invalid', String(Boolean(error.textContent)));
+            errors.set(field, error);
+        });
+        const quantities = () => {
+            const sbg = form.elements.quantity_sbg, b = form.elements.quantity_b;
+            sbg.setCustomValidity('');
+            if (sbg.value !== '' && b.value !== '' && Number(sbg.value) + Number(b.value) <= 0) sbg.setCustomValidity('Jumlah kedua gudang harus lebih dari 0.');
+        };
+        const validate = field => {
+            const validity = field.validity;
+            let message = '';
+            if (!validity.valid) {
+                if (validity.customError) message = field.validationMessage;
+                else if (validity.valueMissing) message = 'Kolom ini wajib diisi.';
+                else if (validity.rangeUnderflow) message = `Nilai minimal ${field.min}.`;
+                else if (validity.rangeOverflow) message = `Nilai maksimal ${field.max}.`;
+                else if (validity.stepMismatch) message = 'Gunakan maksimal 2 angka desimal.';
+                else message = 'Periksa kembali nilai yang dimasukkan.';
+            }
+            errors.get(field).textContent = message;
+            field.setAttribute('aria-invalid', String(Boolean(message)));
+            return !message;
+        };
+        fields.forEach(field => {
+            field.addEventListener('blur', () => { quantities(); validate(field); });
+            field.addEventListener('input', () => {
+                quantities();
+                if (field.getAttribute('aria-invalid') === 'true') validate(field);
+                if (field.name.startsWith('quantity_') && form.elements.quantity_sbg.getAttribute('aria-invalid') === 'true') validate(form.elements.quantity_sbg);
+            });
+        });
+        form.addEventListener('submit', event => {
+            quantities();
+            const invalid = fields.filter(field => !field.disabled && !validate(field));
+            if (invalid.length) {
+                event.preventDefault();
+                invalid[0].focus({preventScroll:true});
+                invalid[0].scrollIntoView({block:'center', behavior:'instant'});
+            }
+        });
+    });
+
     const kpis = document.getElementById('ringkasan');
     if (kpis) {
         let previousWidth = 0;
@@ -91,6 +167,11 @@ document.addEventListener('DOMContentLoaded', () => {
             delete kpis.dataset.wideValues;
             const values = [...kpis.querySelectorAll('.sbg-kpi-value')];
             values.forEach(value => value.style.removeProperty('font-size'));
+            // Premium cards reserve a separate artwork lane, including on mobile.
+            values.filter(value => value.closest('.sbg-kpi-payment')).forEach(value => {
+                let size = parseFloat(getComputedStyle(value).fontSize);
+                while (value.scrollWidth > value.clientWidth + 1 && size > 14) value.style.fontSize = `${--size}px`;
+            });
             if (innerWidth < 1280) return;
             let needsWiderCards = false;
             values.forEach(value => {
@@ -104,6 +185,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         new ResizeObserver(() => fitValues()).observe(kpis);
+        new MutationObserver(() => fitValues(true)).observe(kpis, {subtree:true, childList:true, characterData:true});
         document.fonts.ready.then(() => fitValues(true));
     }
 });

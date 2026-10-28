@@ -361,7 +361,7 @@
             poView: window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table',
             activeView: location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard',
             isDetailModalOpen: false,
-            isCreateModalOpen: false,
+            isCreateModalOpen: @json(old('_sbg_create') === '1' && session('errors')?->any()),
             isEditModalOpen: false,
             isAddAdminModalOpen: false,
             createNewRegion: false,
@@ -394,12 +394,12 @@
             // State Selected PO & Edit PO
             selectedPo: {},
             editPo: {},
-            createQuantities: { sbg: 0, b: 0 },
+            createQuantities: { sbg: @json(old('_sbg_create') === '1' ? old('quantity_sbg', 0) : 0), b: @json(old('_sbg_create') === '1' ? old('quantity_b', 0) : 0) },
             createPrices: {
-                supplier_price: '',
-                supplier_price_b: '0',
-                maker_price: '',
-                partner_margin: ''
+                supplier_price: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('supplier_price', '') : '')),
+                supplier_price_b: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('supplier_price_b', '0') : '0')),
+                maker_price: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('maker_price', '') : '')),
+                partner_margin: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('partner_margin', '') : ''))
             },
 
             allPoData: @json($purchaseOrders->items()),
@@ -593,6 +593,7 @@
                 'all': 'Semua'
             },
             data: {
+                totalProfit: 0,
                 topItems: [],
                 topCategories: [],
                 topItem: { name: '-', total: 0 },
@@ -640,7 +641,13 @@
     <div x-show="activeView === 'dashboard'" class="sbg-workspace">
 
         <!-- ALERT SUCCESS / ERROR -->
-        @if (session('success'))
+        @if (session('success') === 'Purchase Order berhasil dibuat.')
+            <div data-sbg-po-success x-data="{ visible: true }" x-show="visible" class="sbg-po-success-toast" role="status">
+                <span class="sbg-v22-header-icon"><x-sbg.icon name="check"/></span>
+                <div><strong>Purchase Order berhasil dibuat.</strong><button type="button" @click="navigateDashboard('orders'); visible = false">Lihat daftar PO <span aria-hidden="true">→</span></button></div>
+                <button type="button" @click="visible = false" class="sbg-v22-close" aria-label="Tutup notifikasi">&times;</button>
+            </div>
+        @elseif (session('success'))
             <div class="p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-sm font-medium flex items-center gap-3 shadow-sm">
                 <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                 <span>{{ session('success') }}</span>
@@ -779,295 +786,13 @@
     <!-- ========================================================= -->
     <!-- MODAL DETAIL FEE MITRA                                     -->
     <!-- ========================================================= -->
-    <div x-data="partnerFeeModal"
-         @open-modal-fee-mitra.window="openModal($event.detail)"
-         x-show="open"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95"
-         x-transition:enter-end="opacity-100 scale-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 scale-100"
-         x-transition:leave-end="opacity-0 scale-95"
-         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-         x-cloak>
-
-        <div @click.away="open = false" class="sbg-modal-panel bg-white w-full max-w-lg rounded-xl p-6 space-y-4 border border-[#dce1d6] relative max-h-[85vh] flex flex-col">
-            <div class="flex items-center justify-between pb-3 border-b border-[#dce1d6] shrink-0">
-                <div>
-                    <h3 class="text-lg font-extrabold text-[#123d2c]">Rincian Fee Mitra</h3>
-                    <p class="text-xs text-[#687168]">Daftar akumulasi fee untuk mitra/dapur</p>
-                </div>
-                <button @click="open = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
-            </div>
-
-            <div class="sbg-payment-tools" role="group" aria-label="Tindakan rincian pembayaran"><button type="button" @click="mode = 'detail'" :aria-pressed="mode === 'detail'">Pembayaran</button><button type="button" @click="mode = 'print'" :aria-pressed="mode === 'print'"><x-sbg.icon name="print" :size="16"/>Print</button><button type="button" @click="mode = 'download'" :aria-pressed="mode === 'download'"><x-sbg.icon name="download" :size="16"/>Download</button></div>
-            <div class="overflow-y-auto space-y-3 flex-1 pr-1">
-                <div x-show="selectableItems().length > 0" class="flex items-center justify-between px-1 pb-1">
-                    <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#435348] cursor-pointer">
-                        <input type="checkbox" :checked="allSelected()" @change="toggleAll()" class="w-4 h-4 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547]">
-                        <span>Pilih semua yang belum dibayar</span>
-                    </label>
-                    <span class="text-[10px] font-bold text-[#123d2c]" x-text="selectedIds.length + ' dipilih'"></span>
-                </div>
-                <template x-if="items.length > 0">
-                    <div>
-                        <template x-for="item in items" :key="item.id">
-                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-start gap-3 text-xs mb-3" :class="item.is_partner_fee_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
-                                <input type="checkbox" :value="String(item.id)" x-model="selectedIds" :disabled="item.is_partner_fee_paid" class="w-4 h-4 shrink-0 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547] disabled:cursor-not-allowed">
-                                <div class="space-y-0.5 min-w-0 flex-1">
-                                    <h4 class="font-bold text-[#1c3328]" x-text="item.item_name"></h4>
-                                    <p class="text-[#687168] text-[11px]" x-text="inputDate(item)"></p>
-                                    <div class="space-y-2 pt-2 text-[11px]">
-                                        <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-800">
-                                            <p class="font-bold break-words" x-text="'SBG = ' + formatRupiah(Number((item.quantity_sbg ?? item.quantity ?? 0)) * Number(item.partner_margin || 0))"></p>
-                                            <p class="mt-0.5" x-text="(item.quantity_sbg ?? item.quantity ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.partner_margin)"></p>
-                                        </div>
-                                        <div class="rounded-md bg-blue-50 px-2 py-1.5 text-blue-800">
-                                            <p class="font-bold break-words" x-text="'B = ' + formatRupiah(Number((item.quantity_b ?? 0)) * Number(item.maker_price || 0))"></p>
-                                            <p class="mt-0.5" x-text="(item.quantity_b ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.maker_price)"></p>
-                                        </div>
-                                    </div>
-                                <div class="mt-3 border-t border-[#dce1d6] pt-2 flex flex-wrap items-center justify-between gap-2">
-                                    <span class="font-bold text-[#435348]">TOTAL</span>
-                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_partner_fee_paid ? 0 : (item.total_partner_fee ?? 0))"></span>
-                                    <span :class="item.is_partner_fee_paid ? 'bg-[#e9efe6] text-[#123d2c]' : 'bg-amber-100 text-amber-700'" class="block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 text-center" x-text="item.is_partner_fee_paid ? 'Lunas' : 'Belum Bayar'"></span>
-                                </div>
-                                </div>
-                            </label>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="items.length === 0">
-                    <div class="py-8 text-center text-[#687168] text-xs font-medium">Belum ada rincian transaksi fee mitra.</div>
-                </template>
-            </div>
-
-            <div class="pt-3 border-t border-[#dce1d6] shrink-0 space-y-3">
-                <div class="flex justify-between items-center text-sm font-bold">
-                    <span class="text-[#435348]">Total Data Dipilih:</span>
-                    <span class="text-lg font-black text-[#123d2c]" x-text="formatRupiah(selectedTotal())"></span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button type="button" @click="open = false" class="py-2.5 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold rounded-md text-xs transition">Tutup</button>
-                    <button x-show="mode === 'print'" type="button" @click="printSelectedNote()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Print Nota</button>
-                    <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Download PDF</button>
-                    <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Kirim ke WhatsApp</button>
-                    @if(auth()->user()->isSuperAdmin())
-                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting && selectedIds.length > 0) { submitting = true; $el.submit(); }" action="{{ route('dashboard.partner-fee.pay-all') }}" method="POST" class="sm:col-span-2">
-                            @csrf
-                            <template x-for="item in selectedItems().filter(item => !item.is_partner_fee_paid)" :key="item.id">
-                                <input type="hidden" name="ids[]" :value="item.id">
-                            </template>
-                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar yang sudah diceklis</button>
-                            <div x-show="confirming" x-cloak x-transition.opacity @keydown.escape.stop.prevent="if (!submitting) confirming = false" class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#0a291e]/40 backdrop-blur-sm p-5">
-                                <div role="dialog" aria-modal="true" aria-labelledby="confirm-partner-payment-title" aria-describedby="confirm-partner-payment-description" class="sbg-modal-confirm w-full rounded-lg bg-white p-6 shadow-xl space-y-4">
-                                    <h4 id="confirm-partner-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar yang sudah diceklis?</h4>
-                                    <p id="confirm-partner-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin membayar hanya item yang sudah diceklis?</p>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <button x-ref="cancelPayment" type="button" @click="confirming = false" :disabled="submitting" class="rounded-md bg-[#f7f7f0] px-4 py-2.5 text-xs font-bold text-[#435348] hover:bg-[#e9efe6] disabled:opacity-50">Batal</button>
-                                        <button type="submit" :disabled="submitting || selectedIds.length === 0" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar yang Dipilih'">Ya, Bayar yang Dipilih</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================================= -->
-    <!-- MODAL DETAIL BAYAR SUPPLIER                                     -->
-    <!-- ========================================================= -->
-    <div x-data="partnerFeeModal"
-         @open-modal-supplier.window="openModal($event.detail)"
-         x-show="open"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95"
-         x-transition:enter-end="opacity-100 scale-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 scale-100"
-         x-transition:leave-end="opacity-0 scale-95"
-         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-         x-cloak>
-
-        <div @click.away="open = false" class="sbg-modal-panel bg-white w-full max-w-lg rounded-xl p-6 space-y-4 border border-[#dce1d6] relative max-h-[85vh] flex flex-col">
-            <div class="flex items-center justify-between pb-3 border-b border-[#dce1d6] shrink-0">
-                <div>
-                    <h3 class="text-lg font-extrabold text-[#123d2c]">Rincian Bayar Supplier</h3>
-                    <p class="text-xs text-[#687168]">Daftar akumulasi pembayaran supplier</p>
-                </div>
-                <button @click="open = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
-            </div>
-
-            <div class="sbg-payment-tools" role="group" aria-label="Tindakan rincian pembayaran"><button type="button" @click="mode = 'detail'" :aria-pressed="mode === 'detail'">Pembayaran</button><button type="button" @click="mode = 'print'" :aria-pressed="mode === 'print'"><x-sbg.icon name="print" :size="16"/>Print</button><button type="button" @click="mode = 'download'" :aria-pressed="mode === 'download'"><x-sbg.icon name="download" :size="16"/>Download</button></div>
-            <div class="overflow-y-auto space-y-3 flex-1 pr-1">
-                <div x-show="selectableItems().length > 0" class="flex items-center justify-between px-1 pb-1">
-                    <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#435348] cursor-pointer">
-                        <input type="checkbox" :checked="allSelected()" @change="toggleAll()" class="w-4 h-4 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547]">
-                        <span>Pilih semua yang belum dibayar</span>
-                    </label>
-                    <span class="text-[10px] font-bold text-[#123d2c]" x-text="selectedIds.length + ' dipilih'"></span>
-                </div>
-                <template x-if="items.length > 0">
-                    <div>
-                        <template x-for="item in items" :key="item.id">
-                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-start gap-3 text-xs mb-3" :class="item.is_supplier_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
-                                <input type="checkbox" :value="String(item.id)" x-model="selectedIds" :disabled="item.is_supplier_paid" class="w-4 h-4 shrink-0 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547] disabled:cursor-not-allowed">
-                                <div class="space-y-0.5 min-w-0 flex-1">
-                                    <h4 class="font-bold text-[#1c3328]" x-text="item.item_name"></h4>
-                                    <p class="text-[#687168] text-[11px]" x-text="inputDate(item)"></p>
-                                    <p class="text-[#123d2c] font-semibold text-[11px]" x-text="'Supplier: ' + (item.supplier_name || '-')"></p>
-                                    <div class="space-y-2 pt-2 text-[11px]">
-                                        <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-800">
-                                            <p class="font-bold break-words" x-text="'SBG = ' + formatRupiah(Number((item.quantity_sbg ?? item.quantity ?? 0)) * Number(item.supplier_price || 0))"></p>
-                                            <p class="mt-0.5" x-text="(item.quantity_sbg ?? item.quantity ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.supplier_price)"></p>
-                                        </div>
-                                    </div>
-                                <div class="mt-3 border-t border-[#dce1d6] pt-2 flex flex-wrap items-center justify-between gap-2">
-                                    <span class="font-bold text-[#435348]">TOTAL</span>
-                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_supplier_paid ? 0 : (item.total_supplier_amount ?? 0))"></span>
-                                    <span :class="item.is_supplier_paid ? 'bg-[#e9efe6] text-[#123d2c]' : 'bg-amber-100 text-amber-700'" class="block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 text-center" x-text="item.is_supplier_paid ? 'Lunas' : 'Belum Bayar'"></span>
-                                </div>
-                                </div>
-                            </label>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="items.length === 0">
-                    <div class="py-8 text-center text-[#687168] text-xs font-medium">Belum ada rincian transaksi pembayaran supplier.</div>
-                </template>
-            </div>
-
-            <div class="pt-3 border-t border-[#dce1d6] shrink-0 space-y-3">
-                <div class="flex justify-between items-center text-sm font-bold">
-                    <span class="text-[#435348]">Total Data Dipilih:</span>
-                    <span class="text-lg font-black text-[#123d2c]" x-text="formatRupiah(selectedTotal())"></span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button type="button" @click="open = false" class="py-2.5 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold rounded-md text-xs transition">Tutup</button>
-                    <button x-show="mode === 'print'" type="button" @click="printSelectedNote()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Print Nota</button>
-                    <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Download PDF</button>
-                    <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Kirim ke WhatsApp</button>
-                    @if(auth()->user()->isSuperAdmin())
-                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting && selectedIds.length > 0) { submitting = true; $el.submit(); }" action="{{ route('dashboard.supplier.pay-all') }}" method="POST" class="sm:col-span-2">
-                            @csrf
-                            <template x-for="item in selectedItems().filter(item => !item.is_supplier_paid)" :key="item.id">
-                                <input type="hidden" name="ids[]" :value="item.id">
-                            </template>
-                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar yang sudah diceklis</button>
-                            <div x-show="confirming" x-cloak x-transition.opacity @keydown.escape.stop.prevent="if (!submitting) confirming = false" class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#0a291e]/40 backdrop-blur-sm p-5">
-                                <div role="dialog" aria-modal="true" aria-labelledby="confirm-supplier-payment-title" aria-describedby="confirm-supplier-payment-description" class="sbg-modal-confirm w-full rounded-lg bg-white p-6 shadow-xl space-y-4">
-                                    <h4 id="confirm-supplier-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar yang sudah diceklis?</h4>
-                                    <p id="confirm-supplier-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin membayar hanya item yang sudah diceklis?</p>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <button x-ref="cancelPayment" type="button" @click="confirming = false" :disabled="submitting" class="rounded-md bg-[#f7f7f0] px-4 py-2.5 text-xs font-bold text-[#435348] hover:bg-[#e9efe6] disabled:opacity-50">Batal</button>
-                                        <button type="submit" :disabled="submitting || selectedIds.length === 0" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar yang Dipilih'">Ya, Bayar yang Dipilih</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================================= -->
-    <!-- MODAL DETAIL FEE KSPPG                                     -->
-    <!-- ========================================================= -->
-    <div x-data="partnerFeeModal"
-         @open-modal-fee-ksppg.window="openModal($event.detail)"
-         x-show="open"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95"
-         x-transition:enter-end="opacity-100 scale-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 scale-100"
-         x-transition:leave-end="opacity-0 scale-95"
-         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-         x-cloak>
-
-        <div @click.away="open = false" class="sbg-modal-panel bg-white w-full max-w-lg rounded-xl p-6 space-y-4 border border-[#dce1d6] relative max-h-[85vh] flex flex-col">
-            <div class="flex items-center justify-between pb-3 border-b border-[#dce1d6] shrink-0">
-                <div>
-                    <h3 class="text-lg font-extrabold text-[#123d2c]">Rincian Fee KSPPG</h3>
-                    <p class="text-xs text-[#687168]">Daftar akumulasi fee KSPPG</p>
-                </div>
-                <button @click="open = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
-            </div>
-
-            <div class="sbg-payment-tools" role="group" aria-label="Tindakan rincian pembayaran"><button type="button" @click="mode = 'detail'" :aria-pressed="mode === 'detail'">Pembayaran</button><button type="button" @click="mode = 'print'" :aria-pressed="mode === 'print'"><x-sbg.icon name="print" :size="16"/>Print</button><button type="button" @click="mode = 'download'" :aria-pressed="mode === 'download'"><x-sbg.icon name="download" :size="16"/>Download</button></div>
-            <div class="overflow-y-auto space-y-3 flex-1 pr-1">
-                <div x-show="selectableItems().length > 0" class="flex items-center justify-between px-1 pb-1">
-                    <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#435348] cursor-pointer">
-                        <input type="checkbox" :checked="allSelected()" @change="toggleAll()" class="w-4 h-4 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547]">
-                        <span>Pilih semua yang belum dibayar</span>
-                    </label>
-                    <span class="text-[10px] font-bold text-[#123d2c]" x-text="selectedIds.length + ' dipilih'"></span>
-                </div>
-                <template x-if="items.length > 0">
-                    <div>
-                        <template x-for="item in items" :key="item.id">
-                            <label class="p-3.5 bg-[#e9efe6]/40 rounded-lg border border-[#dce1d6] flex items-start gap-3 text-xs mb-3" :class="item.is_ksppg_fee_paid ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'">
-                                <input type="checkbox" :value="String(item.id)" x-model="selectedIds" :disabled="item.is_ksppg_fee_paid" class="w-4 h-4 shrink-0 rounded border-[#dce1d6] text-[#123d2c] focus:ring-[#587547] disabled:cursor-not-allowed">
-                                <div class="space-y-0.5 min-w-0 flex-1">
-                                    <h4 class="font-bold text-[#1c3328]" x-text="item.item_name"></h4>
-                                    <p class="text-[#687168] text-[11px]" x-text="inputDate(item)"></p>
-                                    <div class="space-y-2 pt-2 text-[11px]">
-                                        <div class="rounded-md bg-emerald-50 px-2 py-1.5 text-emerald-800">
-                                            <p class="font-bold break-words" x-text="'SBG = ' + formatRupiah(Number((item.quantity_sbg ?? item.quantity ?? 0)) * Number(item.ksppg_margin_per_unit || 0))"></p>
-                                            <p class="mt-0.5" x-text="(item.quantity_sbg ?? item.quantity ?? 0) + ' ' + (item.unit || '') + ' × ' + formatRupiah(item.ksppg_margin_per_unit)"></p>
-                                        </div>
-                                    </div>
-                                <div class="mt-3 border-t border-[#dce1d6] pt-2 flex flex-wrap items-center justify-between gap-2">
-                                    <span class="font-bold text-[#435348]">TOTAL</span>
-                                    <span class="font-black text-[#123d2c] text-sm" x-text="formatRupiah(item.is_ksppg_fee_paid ? 0 : (item.total_ksppg_fee ?? 0))"></span>
-                                    <span :class="item.is_ksppg_fee_paid ? 'bg-[#e9efe6] text-[#123d2c]' : 'bg-amber-100 text-amber-700'" class="block text-[10px] px-2 py-0.5 rounded-full font-bold mt-1 text-center" x-text="item.is_ksppg_fee_paid ? 'Lunas' : 'Belum Bayar'"></span>
-                                </div>
-                                </div>
-                            </label>
-                        </template>
-                    </div>
-                </template>
-                <template x-if="items.length === 0">
-                    <div class="py-8 text-center text-[#687168] text-xs font-medium">Belum ada rincian transaksi fee KSPPG.</div>
-                </template>
-            </div>
-
-            <div class="pt-3 border-t border-[#dce1d6] shrink-0 space-y-3">
-                <div class="flex justify-between items-center text-sm font-bold">
-                    <span class="text-[#435348]">Total Data Dipilih:</span>
-                    <span class="text-lg font-black text-[#123d2c]" x-text="formatRupiah(selectedTotal())"></span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button type="button" @click="open = false" class="py-2.5 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold rounded-md text-xs transition">Tutup</button>
-                    <button x-show="mode === 'print'" type="button" @click="printSelectedNote()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Print Nota</button>
-                    <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Download PDF</button>
-                    <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Kirim ke WhatsApp</button>
-                    @if(auth()->user()->isSuperAdmin())
-                        <form x-data="{ confirming: false, submitting: false }" x-show="mode === 'detail'" x-effect="if (!open) confirming = false" @submit.prevent="if (confirming && !submitting && selectedIds.length > 0) { submitting = true; $el.submit(); }" action="{{ route('dashboard.ksppg-fee.pay-all') }}" method="POST" class="sm:col-span-2">
-                            @csrf
-                            <template x-for="item in selectedItems().filter(item => !item.is_ksppg_fee_paid)" :key="item.id">
-                                <input type="hidden" name="ids[]" :value="item.id">
-                            </template>
-                            <button type="button" @click="confirming = true; $nextTick(() => $refs.cancelPayment.focus())" :disabled="submitting || selectedIds.length === 0" class="w-full py-2.5 px-3 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed">Bayar yang sudah diceklis</button>
-                            <div x-show="confirming" x-cloak x-transition.opacity @keydown.escape.stop.prevent="if (!submitting) confirming = false" class="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-[#0a291e]/40 backdrop-blur-sm p-5">
-                                <div role="dialog" aria-modal="true" aria-labelledby="confirm-ksppg-payment-title" aria-describedby="confirm-ksppg-payment-description" class="sbg-modal-confirm w-full rounded-lg bg-white p-6 shadow-xl space-y-4">
-                                    <h4 id="confirm-ksppg-payment-title" class="text-lg font-extrabold text-[#123d2c]">Bayar yang sudah diceklis?</h4>
-                                    <p id="confirm-ksppg-payment-description" class="text-sm text-[#435348]">Apakah Anda yakin ingin membayar hanya item yang sudah diceklis?</p>
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <button x-ref="cancelPayment" type="button" @click="confirming = false" :disabled="submitting" class="rounded-md bg-[#f7f7f0] px-4 py-2.5 text-xs font-bold text-[#435348] hover:bg-[#e9efe6] disabled:opacity-50">Batal</button>
-                                        <button type="submit" :disabled="submitting || selectedIds.length === 0" class="rounded-md bg-[#123d2c] px-4 py-2.5 text-xs font-bold text-white hover:bg-[#0a291e] disabled:opacity-50" x-text="submitting ? 'Memproses...' : 'Ya, Bayar yang Dipilih'">Ya, Bayar yang Dipilih</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                    @endif
-                </div>
-            </div>
-        </div>
-    </div>
+    @foreach([
+        ['partner_fee', 'open-modal-fee-mitra', 'Fee Mitra', 'Daftar akumulasi fee untuk mitra/dapur', 'dashboard.partner-fee.pay-all'],
+        ['supplier', 'open-modal-supplier', 'Bayar Supplier', 'Daftar akumulasi pembayaran supplier', 'dashboard.supplier.pay-all'],
+        ['ksppg_fee', 'open-modal-fee-ksppg', 'Fee KSPPG', 'Daftar akumulasi fee KSPPG', 'dashboard.ksppg-fee.pay-all'],
+    ] as [$feeType, $feeEvent, $feeTitle, $feeDescription, $feePayRoute])
+        @include('components.sbg.fee-detail')
+    @endforeach
 
     <!-- ========================================================= -->
     <!-- MODAL RESET PASSWORD KEPALA DAPUR                         -->
@@ -1109,39 +834,7 @@
     <!-- ========================================================= -->
     <!-- MODAL KONFIRMASI LOGOUT                                   -->
     <!-- ========================================================= -->
-    <div x-show="isLogoutModalOpen" 
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95"
-         x-transition:enter-end="opacity-100 scale-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100 scale-100"
-         x-transition:leave-end="opacity-0 scale-95"
-         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-         x-cloak>
-
-        <div @click.away="isLogoutModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-sm rounded-xl p-6 text-center space-y-4 border border-[#dce1d6] relative">
-            <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-            </div>
-            
-            <div class="space-y-1">
-                <h3 class="text-lg font-extrabold text-[#1c3328]">Konfirmasi Logout</h3>
-                <p class="text-xs text-[#687168]">Apakah Anda yakin ingin keluar dari sistem SPPG?</p>
-            </div>
-
-            <div class="grid grid-cols-2 gap-3 pt-2">
-                <button type="button" @click="isLogoutModalOpen = false" class="py-2.5 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold rounded-md text-xs transition">
-                    Batal
-                </button>
-                <form method="POST" action="{{ route('logout') }}" class="w-full">
-                    @csrf
-                    <button type="submit" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-md text-xs transition shadow-sm">
-                        Ya, Logout
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
+    @include('components.sbg.logout-modal')
 
     <!-- MODAL TAMBAH ADMIN & DAERAH BERSAMAAN -->
     <div x-show="isAddAdminModalOpen" 
@@ -1245,177 +938,7 @@
     <!-- ========================================================= -->
     <!-- MODAL 1: TAMBAH PO (CREATE)                               -->
     <!-- ========================================================= -->
-    <div x-show="isCreateModalOpen" 
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4"
-        x-cloak>
-
-        <div @click.away="isCreateModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-2xl rounded-xl overflow-hidden p-4 sm:p-6 space-y-5 relative max-h-[90vh] overflow-y-auto border border-[#dce1d6]">
-            
-            <div class="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 px-4 sm:px-6 py-4 bg-white/95 backdrop-blur border-b border-[#dce1d6] flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg sm:text-xl font-extrabold text-[#1c3328]">Tambah Purchase Order</h3>
-                    <p class="mt-0.5 text-[11px] text-[#687168]">Lengkapi informasi transaksi dan rincian harga.</p>
-                </div>
-                <button type="button" @click="isCreateModalOpen = false" aria-label="Tutup" class="w-9 h-9 shrink-0 rounded-full bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#687168] flex items-center justify-center text-xl font-bold transition">&times;</button>
-            </div>
-
-            <form action="{{ route('dashboard.po.store') }}" method="POST" class="space-y-5">
-                @csrf
-
-                <!-- Kelompok 1: Informasi Transaksi -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6]/80 bg-[#f7f7f0]/60 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">1. Informasi Transaksi</p>
-                    <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-2' : 'md:grid-cols-3' }} gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Tanggal</label>
-                            <input type="date" name="transaction_date" value="{{ date('Y-m-d') }}" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Kategori</label>
-                            <select name="category" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                                <option value="" disabled selected>Pilih Kategori</option>
-                                <option value="Karbo">Karbo</option>
-                                <option value="Protein Nabati">Protein Nabati</option>
-                                <option value="Protein Hewani">Protein Hewani</option>
-                                <option value="Sayur">Sayur</option>
-                                <option value="Buah">Buah</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Prioritas</label>
-                            <select name="priority" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                                <option value="Normal">Normal</option>
-                                <option value="Tinggi">Tinggi</option>
-                                <option value="Rendah">Rendah</option>
-                            </select>
-                        </div>
-                        @if(auth()->user()->canManageFinancials())
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Penanggung Jawab</label>
-                            <select name="created_by" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                                <option value="" disabled {{ old('created_by') ? '' : 'selected' }}>Pilih Penanggung Jawab</option>
-                                @foreach($admins as $adminOption)
-                                    <option value="{{ $adminOption->id }}" {{ (string) old('created_by', auth()->user()->isAdmin() ? auth()->id() : '') === (string) $adminOption->id ? 'selected' : '' }}>
-                                        {{ $adminOption->name }} — {{ $adminOption->region ?? 'Tanpa Wilayah' }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @endif
-                    </div>
-                </div>
-
-                <!-- Kelompok 2: Barang & Supplier -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6]/80 bg-[#f7f7f0]/60 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">2. {{ auth()->user()->canManageFinancials() ? 'Barang & Supplier' : 'Informasi Barang' }}</p>
-                    <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-2' : '' }} gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Nama Barang / PO</label>
-                            <input type="text" name="item_name" placeholder="Contoh: Muli" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                        </div>
-                        @if(auth()->user()->canManageFinancials())
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Supplier</label>
-                            <input type="text" name="supplier_name" placeholder="Nama Supplier" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
-                        </div>
-                        @endif
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                            <label class="block text-xs font-bold text-emerald-800 mb-1">Qty Gudang SBG</label>
-                            <input type="number" step="any" min="0" name="quantity_sbg" x-model="createQuantities.sbg" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(createQuantities.sbg || 0) * Number(String(createPrices.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
-                        </div>
-                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                            <label class="block text-xs font-bold text-blue-800 mb-1">Qty Gudang B</label>
-                            <input type="number" step="any" min="0" name="quantity_b" x-model="createQuantities.b" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(createQuantities.b || 0) * Number(String(createPrices.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Satuan</label>
-                            <input type="text" name="unit" placeholder="Kg, Pcs, Box" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Kelompok 3: Detail Harga -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6] bg-[#e9efe6]/40 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">3. Rincian Harga & Margin</p>
-                    <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-3 items-end">
-                        @if(auth()->user()->canManageFinancials())
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                            <label class="block text-xs font-bold text-emerald-800 mb-1">Harga Supplier Gudang SBG</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="supplier_price" placeholder="8.500" x-model="createPrices.supplier_price" @input="createPrices.supplier_price = formatCurrencyInput($event.target)"
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
-                            </div>
-                        </div>
-                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                            <label class="block text-xs font-bold text-blue-800 mb-1">Harga Supplier Gudang B</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="supplier_price_b" placeholder="8.500" x-model="createPrices.supplier_price_b" @input="createPrices.supplier_price_b = formatCurrencyInput($event.target)"
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
-                            </div>
-                        </div>
-                        @endif
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Harga Maker</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="maker_price" placeholder="13.500" x-model="createPrices.maker_price" @input="createPrices.maker_price = formatCurrencyInput($event.target)"
-                                    @if(auth()->user()->canManageFinancials()) :disabled="!hasMinimumCurrencyDigits(createPrices.supplier_price) && !hasMinimumCurrencyDigits(createPrices.supplier_price_b)" @endif
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white disabled:bg-[#f7f7f0] disabled:text-[#687168] disabled:cursor-not-allowed">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Laba Mitra / unit</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="partner_margin" placeholder="3.000" x-model="createPrices.partner_margin" @input="createPrices.partner_margin = formatCurrencyInput($event.target)"
-                                    :disabled="!hasMinimumCurrencyDigits(createPrices.maker_price)"
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white disabled:bg-[#f7f7f0] disabled:text-[#687168] disabled:cursor-not-allowed">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Kelompok 4: Tahapan & Catatan -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6]/80 bg-[#f7f7f0]/60 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">4. Status & Catatan Tambahan</p>
-                    <div>
-                        <label class="block text-xs font-semibold text-[#435348] mb-1">Tahapan Status</label>
-                        <select name="status_stage" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                            <option value="" disabled selected>Pilih Tahapan Status</option>
-                            <option value="Cari Supplier">Cari Supplier</option>
-                            <option value="Sortir">Sortir</option>
-                            <option value="Pengiriman">Pengiriman</option>
-                            <option value="Selesai">Selesai</option>
-                            <option value="Retur">Retur</option>
-                            <option value="Kekurangan">Kekurangan</option>
-                            <option value="Perubahan Item">Perubahan Item</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-[#435348] mb-1">Catatan</label>
-                        <textarea name="notes" rows="2" placeholder="Contoh: Naik 11kg 148000" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition"></textarea>
-                    </div>
-                </div>
-
-                <div class="sticky bottom-0 z-10 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 px-4 sm:px-6 py-4 bg-white/95 backdrop-blur flex flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t border-[#dce1d6]">
-                    <button type="button" @click="isCreateModalOpen = false" class="w-full sm:w-auto px-5 py-2.5 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold rounded-md text-xs transition">Batal</button>
-                    <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm">Simpan PO</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    @include('components.sbg.create-po-modal')
 
     @include('components.sbg.po-detail')
 
@@ -1832,109 +1355,7 @@
         </div>
     </div>
 
-    <div x-data="analisaKeuntunganModal()"
-        x-show="isAnalysisModalOpen" 
-        x-on:open-analisa-modal.window="isAnalysisModalOpen = true; fetchData();"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 scale-95"
-        x-transition:enter-end="opacity-100 scale-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 scale-100"
-        x-transition:leave-end="opacity-0 scale-95"
-        class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-        x-cloak>
-
-        <div @click.away="isAnalysisModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-lg rounded-xl p-6 space-y-5 border border-[#dce1d6] relative max-h-[90vh] overflow-y-auto">
-            
-            <!-- Header Modal -->
-            <div class="flex items-center justify-between border-b border-[#dce1d6] pb-3">
-                <h3 class="text-lg font-extrabold text-[#1c3328]">Analisa Keuntungan</h3>
-                <button @click="isAnalysisModalOpen = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
-            </div>
-
-            <!-- Filter Period Pills -->
-            <div class="flex flex-wrap gap-2">
-                <template x-for="(label, key) in filterOptions" :key="key">
-                    <button type="button" 
-                            @click="activeFilter = key; fetchData();" 
-                            :class="activeFilter === key ? 'bg-[#123d2c] text-white shadow-sm' : 'bg-[#f7f7f0] text-[#435348] hover:bg-[#e9efe6]'"
-                            class="px-3.5 py-1.5 rounded-full text-xs font-semibold transition"
-                            x-text="label">
-                    </button>
-                </template>
-            </div>
-
-            <!-- State Loading -->
-            <div x-show="loading" class="py-8 text-center text-xs text-[#687168] font-medium">
-                Memuat data analisa...
-            </div>
-
-            <div x-show="!loading && error" class="rounded-md bg-rose-50 p-4 text-center text-xs font-medium text-rose-700">
-                <span x-text="error"></span>
-                <button type="button" @click="fetchData()" class="ml-2 font-bold underline">Coba lagi</button>
-            </div>
-
-            <!-- Content Analyst Data -->
-            <div x-show="!loading && !error" class="space-y-5">
-                <!-- Section: Top Items -->
-                <div class="space-y-2">
-                    <div class="flex items-center gap-1.5 text-xs font-bold text-[#1c3328]">
-                        <span>🎗️</span>
-                        <span>Top Items</span>
-                    </div>
-                    <template x-for="(item, index) in data.topItems" :key="item.name">
-                        <div class="flex items-center justify-between gap-3 p-4 bg-amber-50/60 border border-amber-200/60 rounded-lg">
-                            <div class="flex min-w-0 items-center gap-3">
-                                <span class="text-lg font-black text-amber-500" x-text="'#' + (index + 1)"></span>
-                                <div class="min-w-0">
-                                    <h4 class="font-bold text-[#1c3328] text-xs sm:text-sm break-words" x-text="item.name"></h4>
-                                    <p class="text-[10px] text-[#687168] font-medium">{{ auth()->user()->isRegularAdmin() ? 'Sisa Fee Admin / Mitra' : 'Sisa Fee KSPPG' }}</p>
-                                </div>
-                            </div>
-                            <span class="shrink-0 font-extrabold text-amber-600 text-xs sm:text-sm" x-text="formatRupiah(item.total)"></span>
-                        </div>
-                    </template>
-                    <p x-show="data.topItems.length === 0" class="text-xs text-[#687168]">Belum ada data item.</p>
-                </div>
-
-                <!-- Section: Ranking Kategori -->
-                <div class="space-y-2">
-                    <div class="flex items-center gap-1.5 text-xs font-bold text-[#1c3328]">
-                        <span>📚</span>
-                        <span>Ranking Kategori</span>
-                    </div>
-                    <template x-for="(category, index) in data.topCategories" :key="category.name">
-                        <div class="flex items-center justify-between gap-3 p-4 bg-[#e9efe6]/60 border border-[#dce1d6]/60 rounded-lg">
-                            <div class="flex min-w-0 items-center gap-3">
-                                <span class="text-lg font-black text-[#123d2c]" x-text="'#' + (index + 1)"></span>
-                                <div class="min-w-0">
-                                    <h4 class="font-bold text-[#1c3328] text-xs sm:text-sm break-words" x-text="category.name"></h4>
-                                    <p class="text-[10px] text-[#687168] font-medium">{{ auth()->user()->isRegularAdmin() ? 'Sisa Fee Admin / Mitra' : 'Sisa Fee KSPPG' }}</p>
-                                </div>
-                            </div>
-                            <span class="shrink-0 font-extrabold text-[#123d2c] text-xs sm:text-sm" x-text="formatRupiah(category.total)"></span>
-                        </div>
-                    </template>
-                    <p x-show="data.topCategories.length === 0" class="text-xs text-[#687168]">Belum ada data kategori.</p>
-                </div>
-
-                <!-- Section Grid: Item Terbaik & Terendah -->
-                <div class="grid grid-cols-2 gap-3 pt-1">
-                    <div class="p-4 bg-[#e9efe6]/60 border border-[#dce1d6]/60 rounded-lg">
-                        <p class="text-[10px] font-semibold text-[#687168]">Item Terbaik</p>
-                        <h4 class="font-bold text-[#1c3328] text-xs sm:text-sm mt-1" x-text="data.bestItem.name"></h4>
-                        <p class="font-extrabold text-[#123d2c] text-xs sm:text-sm mt-0.5" x-text="formatRupiah(data.bestItem.total)"></p>
-                    </div>
-                    <div class="p-4 bg-rose-50/60 border border-rose-200/60 rounded-lg">
-                        <p class="text-[10px] font-semibold text-[#687168]">Item Terendah</p>
-                        <h4 class="font-bold text-[#1c3328] text-xs sm:text-sm mt-1" x-text="data.worstItem.name"></h4>
-                        <p class="font-extrabold text-rose-600 text-xs sm:text-sm mt-0.5" x-text="formatRupiah(data.worstItem.total)"></p>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </div>
+    @include('components.sbg.analytics-modal')
     @if($loginPopup?->enabled && $showLoginPopup)
         <div x-data="{ open: true }" x-show="open" x-cloak class="sbg-modal fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-[#0a291e]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="login-popup-title" @keydown.escape.window="open = false">
             <div class="sbg-modal-panel w-full max-w-lg overflow-hidden rounded-xl bg-white">

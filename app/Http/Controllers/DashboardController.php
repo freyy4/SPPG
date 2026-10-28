@@ -839,8 +839,13 @@ class DashboardController extends Controller
             ->orderBy('item_name')
             ->first();
 
+        // Presentation-only grand total: reuse the exact existing fee expression,
+        // scoped query and payment filters, without the ranking's three-item limit.
+        $totalProfit = (float) ((clone $query)->selectRaw($totalFee.' as total_fee')->value('total_fee') ?? 0);
+
         // 6. Return Format JSON untuk UI Modal
         return response()->json([
+            'totalProfit' => $totalProfit,
             'topItems' => $topItems->map(fn ($item) => [
                 'name' => $item->item_name,
                 'total' => (float) $item->total_fee,

@@ -27,6 +27,11 @@
         @case('calendar')<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 2v6m10-6v6M3 11h18"/>@break
         @case('menu')<path d="M4 6h16M4 12h16M4 18h16"/>@break
         @case('logout')<path d="M9 4H4v16h5m5-13 5 5-5 5m-6-5h12"/>@break
+        @case('crown')<path d="m3 6 5 4 4-7 4 7 5-4-2 13H5ZM6 22h12"/>@break
+        @case('trophy')<path d="M8 3h8v7a4 4 0 0 1-8 0ZM8 5H4v4a4 4 0 0 0 4 4m8-8h4v4a4 4 0 0 1-4 4M12 14v5m-5 3h10m-8-3h6"/>@break
+        @case('trend-down')<path d="m3 5 6 6 4-4 8 10m-7 0h7v-7"/>@break
+        @case('pie')<path d="M12 3v9h9A9 9 0 1 1 12 3ZM15 2v7h7a8 8 0 0 0-7-7Z"/>@break
+        @case('whatsapp')<path d="m3 21 1-5a9 9 0 1 1 4 4Zm5-14c-2 3 3 8 6 9l3-2-3-2-1 1-3-3 1-1-2-3Z"/>@break
         @case('leaf')<path d="M4 20C0 8 12 1 21 3c1 11-6 18-17 17Zm0 0L16 8"/>@break
         @default<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
     @endswitch
