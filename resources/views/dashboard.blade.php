@@ -7,7 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
@@ -219,7 +219,9 @@
                         .total strong{font-size:20px}.footer{text-align:center;color:#6b7280;font-size:9px;padding:0 18px 18px}
                         .verify{text-align:center;border-top:1px solid #e5e7eb;padding:18px}.verify img{width:130px;height:130px}.verified{font-size:10px;font-weight:bold;letter-spacing:2px;color:#047857;margin:8px 0 3px}
                         @media print{body{padding:0}.note{border:none;max-width:none}}
-                    </style></head><body>
+                    </style>    <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v=2">
+    <script defer src="{{ asset('js/sbg-v2.js') }}?v=2"></script>
+</head><body>
                     <section class="note"><div class="bar"></div><header class="header">
                         <h1>SENTRA BUAH GARUT</h1>
                         <p class="address">Jl. Ahmad Yani Timur Karangpawitan Garut</p>
@@ -353,6 +355,7 @@
         }));
 
         Alpine.data('dashboardApp', () => ({
+            navOpen: false, poView: window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table',
             activeView: location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard',
             isDetailModalOpen: false,
             isCreateModalOpen: false,
@@ -674,6 +677,20 @@
 </head>
 <body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'">
 
+    <button type="button" class="sbg-menu-toggle" @click="navOpen = !navOpen" :aria-expanded="navOpen" aria-controls="sbg-sidebar" aria-label="Buka navigasi">☰</button>
+    <div x-cloak x-show="navOpen" class="sbg-nav-backdrop" @click="navOpen = false"></div>
+    <aside id="sbg-sidebar" class="sbg-sidebar" :class="navOpen ? 'is-open' : ''" @keydown.escape.window="navOpen = false">
+        <a href="{{ route('dashboard') }}" class="sbg-brand"><img src="{{ asset('favicon.svg') }}" alt="" width="38" height="38"><strong>Sentra Buah Garut<small>SISTEM PURCHASE ORDER</small></strong></a>
+        <p class="sbg-nav-caption">WORKSPACE</p>
+        <nav aria-label="Navigasi utama">
+            <a href="#ringkasan" @click="activeView = 'dashboard'; navOpen = false" :class="activeView === 'dashboard' ? 'is-active' : ''"><span>▦</span>Dashboard</a>
+            <a href="#data-po" @click="activeView = 'dashboard'; navOpen = false"><span>▤</span>Purchase Order</a>
+            <a href="#kalkulator-buah" @click="activeView = 'fruit'; navOpen = false; $nextTick(() => document.getElementById('fruit-tab-calculate').click())"><span>▣</span>Kalkulator Buah</a>
+            <a href="#kalkulator-buah" @click="activeView = 'fruit'; navOpen = false; $nextTick(() => document.getElementById('fruit-tab-master').click())"><span>♧</span>Katalog Buah</a>
+            <a href="#kalkulator-buah" @click="activeView = 'fruit'; navOpen = false; $nextTick(() => document.getElementById('fruit-tab-archive').click())"><span>▥</span>Arsip Keputusan</a>
+        </nav>
+        <div class="sbg-sidebar-bottom"><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->region ?? 'Pusat' }}</small><button type="button" @click="isLogoutModalOpen = true; navOpen = false">↪ Keluar</button></div>
+    </aside>
     <!-- NAVBAR: identitas visual mengikuti landing page Sentra Buah Garut -->
     <header x-data="{ mobileNav: false, accountOpen: false }" class="sticky top-0 z-50 border-b border-[#dce1d6] bg-[#f7f7f0]/95 backdrop-blur-xl">
         <div class="mx-auto flex min-h-[82px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
@@ -702,7 +719,7 @@
                         <button type="button" @click="accountOpen = false; isLogoutModalOpen = true" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">Keluar dari akun</button>
                     </div>
                 </div>
-                <button type="button" @click="mobileNav = !mobileNav" class="grid h-11 w-11 place-items-center rounded-md border border-[#dce1d6] text-[#123d2c] md:hidden" :aria-expanded="mobileNav.toString()" aria-label="Buka menu">
+                <button type="button" @click="navOpen = !navOpen" class="grid h-11 w-11 place-items-center rounded-md border border-[#dce1d6] text-[#123d2c] md:hidden" :aria-expanded="navOpen.toString()" aria-label="Buka menu">
                     <svg x-show="!mobileNav" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
                     <svg x-show="mobileNav" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
                 </button>
@@ -720,7 +737,7 @@
 
     @include('components.fruit-calculator')
 
-    <div x-show="activeView === 'dashboard'" class="min-h-screen p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div x-show="activeView === 'dashboard'" class="sbg-workspace min-h-screen p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
 
         <!-- ALERT SUCCESS / ERROR -->
         @if (session('success'))
@@ -745,10 +762,10 @@
         @endif
 
         <!-- HEADER DASHBOARD -->
-        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 overflow-hidden bg-[#123d2c] p-6 sm:p-8 rounded-2xl border border-[#123d2c] shadow-sm text-white">
+        <div class="sbg-welcome flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 overflow-hidden bg-[#123d2c] p-6 sm:p-8 rounded-2xl border border-[#123d2c] shadow-sm text-white">
             <div>
                 <p class="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-[#d0e0cc]">Sistem Purchase Order</p>
-                <h1 class="sbg-heading text-2xl sm:text-3xl font-extrabold tracking-tight">Dashboard Purchase Order</h1>
+                <h1 class="sbg-heading text-2xl sm:text-3xl font-extrabold tracking-tight">Selamat datang, {{ auth()->user()->name }}! 👋</h1>
                 <p class="text-xs sm:text-sm text-[#cedbca] mt-2">
                     Selamat datang, <span class="font-bold text-white">{{ auth()->user()->name }}</span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#f3a51d] text-[#0a291e] ml-1">
@@ -962,12 +979,13 @@
         </details>
 
         <!-- TABLE PURCHASE ORDERS -->
-        <div class="sbg-panel overflow-hidden">
+        <div class="sbg-panel sbg-po-list overflow-hidden" :class="poView === 'cards' ? 'is-cards' : ''">
             <div class="p-5 border-b border-gray-100 flex items-center justify-between">
                 <div>
                     <h2 class="sbg-heading text-base font-extrabold text-[#1c3328]">Daftar Purchase Order</h2>
-                    <p class="mt-1 text-[11px] text-[#687168]">Klik salah satu baris untuk melihat detail lengkap.</p>
+                    <p class="mt-1 text-[11px] text-[#687168]">Klik PO untuk melihat informasi dan pembayaran.</p>
                 </div>
+                <div class="sbg-view-toggle" role="group" aria-label="Tampilan PO"><button type="button" @click="poView = 'table'" :aria-pressed="poView === 'table'">Tabel</button><button type="button" @click="poView = 'cards'" :aria-pressed="poView === 'cards'">Kartu</button></div>
             </div>
             <div class="overflow-x-auto">
                 <table class="w-full text-left border-collapse text-xs sm:text-sm">
@@ -975,7 +993,7 @@
                         <tr class="bg-[#e9efe6] border-b border-[#dce1d6] text-[#576f51] uppercase text-[10px] font-bold tracking-wider">
                             <th class="p-4">No. PO</th>
                             <th class="p-4">Tanggal</th>
-                            <th class="p-4">Dibuat</th>
+                            <th class="p-4">Supplier</th>
                             <th class="p-4">Nama Barang</th>
                             <th class="p-4">Jumlah</th>
                             <th class="p-4">Wilayah</th>
@@ -993,13 +1011,13 @@
                                 aria-label="Lihat detail PO {{ $po->po_number }}"
                                 class="cursor-pointer transition hover:bg-[#f1f4ed] focus:bg-[#f1f4ed] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#587547]"
                             >
-                                <td class="p-4 font-bold text-gray-900">{{ $po->po_number }}</td>
-                                <td class="p-4 text-gray-600">{{ \Carbon\Carbon::parse($po->transaction_date)->format('d/m/Y') }}</td>
-                                <td class="p-4 text-gray-600">{{ $po->created_at?->format('d/m/Y') ?? '-' }}</td>
-                                <td class="p-4 text-gray-900 font-semibold">{{ $po->item_name }}</td>
-                                <td class="p-4 text-gray-600">{{ $po->quantity }} {{ $po->unit }}</td>
-                                <td class="p-4 text-gray-600">{{ $po->region }}</td>
-                                <td class="p-4">
+                                <td data-label="No. PO" class="p-4 font-bold text-gray-900">{{ $po->po_number }}</td>
+                                <td data-label="Tanggal" class="p-4 text-gray-600">{{ \Carbon\Carbon::parse($po->transaction_date)->format('d/m/Y') }}</td>
+                                <td data-label="Supplier" class="p-4 text-gray-600">{{ $po->supplier_name ?: '-' }}</td>
+                                <td data-label="Nama Barang" class="p-4 text-gray-900 font-semibold">{{ $po->item_name }}</td>
+                                <td data-label="Jumlah" class="p-4 text-gray-600">{{ $po->quantity }} {{ $po->unit }}</td>
+                                <td data-label="Wilayah" class="p-4 text-gray-600">{{ $po->region }}</td>
+                                <td data-label="Status" class="p-4">
                                     <span class="px-3 py-1 rounded-full text-[11px] font-bold inline-block
                                         @if($po->status_stage == 'Selesai') bg-emerald-100 text-emerald-700 border border-emerald-200
                                         @elseif($po->status_stage == 'Proses') bg-blue-100 text-blue-700 border border-blue-200
@@ -1770,7 +1788,7 @@
     <!-- ========================================================= -->
     <!-- MODAL 2: DETAIL PO                                        -->
     <!-- ========================================================= -->
-    <div x-show="isDetailModalOpen" 
+    <div role="dialog" aria-modal="true" aria-label="Detail Purchase Order" @keydown.escape.window="isDetailModalOpen = false" x-show="isDetailModalOpen"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="opacity-0"
         x-transition:enter-end="opacity-100"
@@ -1780,12 +1798,12 @@
         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4"
         x-cloak>
 
-        <div @click.away="isDetailModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-sm sm:max-w-md rounded-xl overflow-hidden p-6 space-y-4 relative max-h-[92vh] overflow-y-auto border border-[#dce1d6]">
+        <div @click.away="isDetailModalOpen = false" class="sbg-detail-panel sbg-modal-panel bg-white w-full max-w-sm sm:max-w-md rounded-xl overflow-hidden p-6 space-y-4 relative max-h-[92vh] overflow-y-auto border border-[#dce1d6]">
             
             <!-- HEADER -->
             <div class="flex items-start justify-between border-b border-[#dce1d6] pb-3">
                 <div class="space-y-1">
-                    <h3 class="text-xl font-extrabold text-[#1c3328] leading-none" x-text="selectedPo.item_name"></h3>
+                    <h3 class="text-xl font-extrabold text-[#1c3328] leading-none" x-text="selectedPo.item_name"></h3><p class="text-xs text-[#64756E]" x-text="selectedPo.po_number"></p>
                     <span class="inline-block px-3 py-0.5 text-[11px] font-bold bg-[#e9efe6] text-[#123d2c] rounded-full border border-[#dce1d6]" 
                         x-text="selectedPo.status_stage || 'Selesai'">
                     </span>
@@ -1794,7 +1812,7 @@
             </div>
 
             <!-- DETAIL LIST -->
-            <div class="space-y-2.5 text-xs sm:text-sm">
+            <div class="sbg-detail-columns"><section class="sbg-detail-section"><h4>Informasi PO</h4><div class="space-y-2.5 text-xs sm:text-sm">
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
                     <span class="text-[#687168] font-medium">Tanggal</span>
                     <span class="font-bold text-[#1c3328]" x-text="formatDate(selectedPo.transaction_date)"></span>
@@ -1827,6 +1845,7 @@
                     <span class="text-[#687168] font-medium">Qty</span>
                     <span class="font-bold text-[#1c3328]" x-text="(selectedPo.quantity || 0) + ' ' + (selectedPo.unit || 'Kg')"></span>
                 </div>
+                </div></section><section class="sbg-detail-section"><h4>Rincian biaya</h4><div class="space-y-2.5 text-xs sm:text-sm">
                 @if(auth()->user()->canManageFinancials())
                 <div class="flex justify-between items-center py-1 border-b border-gray-50">
                     <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-semibold">Harga Supplier Gudang SBG</span>
@@ -1873,8 +1892,9 @@
                 </div>
             </div>
 
+            </section></div>
             <!-- ACTION BUTTONS -->
-            <div class="space-y-2 pt-2">
+            <div class="sbg-detail-actions space-y-2 pt-2"><h4>Pembayaran & tindakan</h4>
                 @if(auth()->user()->canManageFinancials())
                 <form :action="'/dashboard/po/' + selectedPo.id + '/toggle-payment'" method="POST">
                     @csrf

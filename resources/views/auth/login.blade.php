@@ -7,7 +7,7 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'DM Sans', sans-serif; }
@@ -15,10 +15,10 @@
         .sbg-login-card { box-shadow: 0 16px 48px rgba(18, 61, 44, .08); }
         :focus-visible { outline: 2px solid #c27909; outline-offset: 3px; }
     </style>
-</head>
+<link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v=2"></head>
 <body class="min-h-screen bg-[#f7f7f0] text-[#1c3328] antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]">
 
-    <main class="min-h-screen flex flex-col items-center justify-center px-4 py-10 sm:px-6">
+    <main class="sbg-login min-h-screen flex flex-col items-center justify-center px-4 py-10 sm:px-6">
         <a href="{{ route('home') }}" class="mb-7 inline-flex items-center gap-3 rounded-md" aria-label="Sentra Buah Garut - beranda">
             <img src="{{ asset('favicon.svg') }}" alt="" class="h-12 w-12 object-contain">
             <span class="flex flex-col">
@@ -27,10 +27,11 @@
             </span>
         </a>
 
+    <div class="sbg-login-shell"><section class="sbg-login-story"><span class="sbg-eyebrow">SEGAR SETIAP HARI, MUDAH DIKELOLA</span><h1>Kelola Buah<br>Lebih Mudah<br>dan <em>Terukur</em></h1><p>Satu sistem untuk mengelola purchase order, menghitung kebutuhan buah, dan memantau pembayaran mitra dapur.</p><div class="sbg-trust"><span>✓ Data real-time</span><span>✓ Mudah digunakan</span><span>✓ Aman & terpercaya</span></div><img src="{{ asset('images/sbg-orchard.svg') }}" alt="Ilustrasi kebun dan keranjang buah Sentra Buah Garut" width="600" height="270"></section>
     <div class="sbg-login-card w-full max-w-md rounded-xl border border-[#dce1d6] bg-white p-6 sm:p-8">
         <div class="mb-7">
             <div class="mb-5 h-1 w-10 rounded-full bg-[#f3a51d]" aria-hidden="true"></div>
-            <h1 class="sbg-heading text-2xl font-extrabold tracking-tight">Masuk ke Akun</h1>
+            <h1 class="sbg-heading text-2xl font-extrabold tracking-tight">Selamat Datang Kembali 👋</h1>
             <p class="mt-2 text-sm leading-relaxed text-[#687168]">Kelola purchase order Anda.</p>
         </div>
 
@@ -107,7 +108,7 @@
                 Masuk
             </button>
         </form>
-    </div>
+    </div></div>
         <a href="{{ route('home') }}" class="mt-6 rounded text-sm font-medium text-[#687168] transition hover:text-[#123d2c]">&larr; Kembali ke beranda</a>
     </main>
 
