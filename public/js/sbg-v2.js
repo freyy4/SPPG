@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
         dialog.querySelectorAll('button').forEach(button => {
-            if (!button.textContent.trim() && button.querySelector('svg') && /false/.test(button.getAttribute('@click') || '')) {
+            if ((button.textContent.trim() === '×' || (!button.textContent.trim() && button.querySelector('svg'))) && /false/.test(button.getAttribute('@click') || '')) {
                 button.setAttribute('aria-label', button.getAttribute('aria-label') || 'Tutup dialog');
                 button.setAttribute('data-dialog-close', '');
                 button.classList.add('sbg-icon-button');

@@ -87,6 +87,7 @@ button { font:inherit; }
 .sbg-filter-field select { padding-right:22px; text-overflow:ellipsis; }
 .sbg-filter-field select:disabled { color:#6b7b71; background:#f3f6f3; cursor:not-allowed; }
 .sbg-filter-search>div { display:flex; align-items:center; gap:0; padding-left:10px; background:#fff; border:1px solid var(--sbg-border); border-radius:10px; color:var(--sbg-muted); }
+.sbg-filter-search input::placeholder { color:var(--sbg-muted); opacity:1; }
 .sbg-filter-search input { border:0; background:transparent; padding-left:8px; }
 .sbg-filter-search>div:focus-within { outline:2px solid var(--sbg-green-700); outline-offset:2px; }
 .sbg-filter-search input:focus-visible { outline:none!important; }
@@ -227,7 +228,7 @@ button { font:inherit; }
     .sbg-mobile-brand { display:flex; margin-right:auto; }
     .sbg-mobile-brand strong { font-size:12px; }
     .sbg-mobile-brand small { font-size:7px; letter-spacing:1px; }
-    .sbg-account-toggle { padding:4px; min-height:44px; border:0; background:transparent; }
+    .sbg-account-toggle { padding:4px; min-width:44px; min-height:44px; border:0; background:transparent; }
     .sbg-sidebar { z-index:70; padding-bottom:calc(24px + env(safe-area-inset-bottom)); }
     .sbg-nav-backdrop { z-index:69; }
     .sbg-workspace { gap:20px; padding:12px 16px 20px; }
@@ -275,7 +276,7 @@ button { font:inherit; }
     .sbg-list-header p,.sbg-price-analysis { display:none; }
     .sbg-list-tools { width:100%; }
     .sbg-view-toggle { width:100%; }
-    .sbg-view-toggle button { flex:1; min-height:36px; }
+    .sbg-view-toggle button { flex:1; min-height:44px; }
     .sbg-po-list { background:transparent; border:0; box-shadow:none; }
     .sbg-po-cards { grid-template-columns:1fr; padding:12px 0 0; gap:10px; }
     .sbg-po-card { border-radius:16px; }
@@ -289,6 +290,10 @@ button { font:inherit; }
     .sbg-po-meta { grid-column:1/-1; margin-top:4px; font-size:11px; }
     .sbg-po-meta>span:last-child { max-width:34%; overflow-wrap:anywhere; }
     .sbg-po-menu { top:100%; }
+    .sbg-po-menu button { min-height:44px; font-size:13px; }
+    .sbg-po-table .sbg-icon-button { width:44px; height:44px; min-height:44px; }
+    .sbg-pagination a,.sbg-pagination button { min-height:44px; }
+    .sbg-modal button:not(.sbg-icon-button) { min-height:44px; }
     .sbg-pagination { border:0; padding:12px 0; }
     .sbg-po-table { min-width:820px; }
     .sbg-mobile-orders-heading { display:grid; position:relative; gap:4px; padding-right:95px; }

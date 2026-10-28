@@ -69,6 +69,8 @@ try {
             await page.screenshot({path:path.join(output, `orders-${width}.png`), fullPage:true});
             const cards = await page.locator('.sbg-po-card').evaluateAll(cards=>cards.map(e=>e.getBoundingClientRect().height));
             assert.ok(cards.every(height=>height>=108&&height<=132), `Mobile PO cards: ${width} ${cards}`);
+            const targets=await page.locator('.sbg-bottom-nav a, .sbg-bottom-nav button, .sbg-topbar button, .sbg-view-toggle button, .sbg-filter-toggle, .sbg-po-card>.sbg-po-overflow>button').evaluateAll(items=>items.filter(e=>e.getClientRects().length).map(e=>{const r=e.getBoundingClientRect();return {label:e.getAttribute('aria-label')||e.textContent.trim(),width:r.width,height:r.height};}));
+            assert.ok(targets.every(target=>target.width>=44&&target.height>=44), `Mobile targets: ${width} ${JSON.stringify(targets)}`);
         }
         await page.locator('.sbg-po-table tbody tr, .sbg-po-list tbody tr').first().count().then(async count => {
             if (phase === 'before' || width >= 768) {
