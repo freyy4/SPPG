@@ -83,7 +83,7 @@ try {
             }
             if (width < 768) assert.ok(metrics.panel.height<=height*.92+1, `Sheet exceeds 92dvh at ${width}`);
             await page.keyboard.press('Escape');
-            await page.waitForTimeout(250);
+            await page.locator('#po-detail').waitFor({state:'hidden',timeout:3000}).catch(async error => { console.log(await page.evaluate(() => ({open:Alpine.$data(document.body).isDetailModalOpen,style:document.getElementById('po-detail').getAttribute('style'),active:document.activeElement.outerHTML.slice(0,200)}))); throw error; });
             assert.equal(await page.locator('#po-detail').isVisible(), false);
         }
     }

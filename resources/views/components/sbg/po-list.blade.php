@@ -1,7 +1,7 @@
 <section class="sbg-panel sbg-po-list" aria-labelledby="po-list-title">
     <div class="sbg-list-header">
         <div><h2 id="po-list-title"><span class="sbg-orders-title">Daftar Purchase Order</span><span class="sbg-activity-title">Aktivitas Terbaru</span></h2><p>Klik PO untuk melihat informasi dan pembayaran.</p></div>
-        <a class="sbg-view-all" href="#data-po" @click="mobilePage = 'orders'">Lihat semua <x-sbg.icon name="arrow" :size="16"/></a>
+        <a class="sbg-view-all" href="#data-po" @click.prevent="navigateDashboard('orders')">Lihat semua <x-sbg.icon name="arrow" :size="16"/></a>
         <div class="sbg-list-tools">
             @if(auth()->user()->isSuperAdmin())<button type="button" class="sbg-price-analysis" @click="$dispatch('open-po-analysis')"><x-sbg.icon name="chart" :size="16"/>Analisa harga</button>@endif
             <div class="sbg-view-toggle" role="group" aria-label="Tampilan PO"><button type="button" @click="poView = 'table'" :aria-pressed="poView === 'table'">Tabel</button><button type="button" @click="poView = 'cards'" :aria-pressed="poView === 'cards'">Kartu</button></div>

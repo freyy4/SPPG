@@ -1,6 +1,7 @@
 @props(['name', 'size' => 20])
 <svg {{ $attributes->class('sbg-icon') }} width="{{ $size }}" height="{{ $size }}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     @switch($name)
+        @case('wave')<path d="m9 12-3-7c-1-2-3-1-2 1l4 10-4-3c-2-1-3 1-1 3l6 5c3 3 8 1 10-3l2-7c1-2-2-3-3-1l-1 3 1-10c0-2-3-2-3 0l-1 7-2-9c0-2-3-1-3 1l1 8-4-8c-1-2-3-1-2 1Z" fill="#ffcf5b" stroke="#be872e" stroke-width="1.2"/><path d="m19 2 2-1M22 5l2-1M2 20l-1 2" stroke="#be872e"/>@break
         @case('home')<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z"/>@break
         @case('po')<path d="M8 3H5v18h14V3h-3M9 2h6v4H9zM8 11h8M8 15h6"/>@break
         @case('calculator')<rect x="4" y="2" width="16" height="20" rx="3"/><path d="M8 6h8M8 11h1m6 0h1m-8 4h1m6 0h1m-8 4h1m6 0h1"/>@break

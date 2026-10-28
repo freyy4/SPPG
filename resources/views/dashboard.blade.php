@@ -353,7 +353,7 @@
         }));
 
         Alpine.data('dashboardApp', () => ({
-            navOpen: false, mobilePage: location.hash === '#data-po' ? 'orders' : 'home',
+            navOpen: false, mobilePage: location.hash === '#data-po' ? 'orders' : (location.hash === '#master-data' ? 'admin' : 'home'),
             filterOpen: @json($errors->has('date_from') || $errors->has('date_to')),
             wideFilters: window.matchMedia('(min-width: 768px)').matches,
             desktopNav: window.matchMedia('(min-width: 1280px)').matches,
@@ -470,6 +470,11 @@
             openFruitTab(tab) {
                 this.activeView = 'fruit'; this.navOpen = false;
                 this.$nextTick(() => document.getElementById('fruit-tab-' + tab)?.click());
+            },
+            navigateDashboard(page) {
+                this.activeView = 'dashboard'; this.mobilePage = page; this.navOpen = false;
+                history.replaceState(null, '', page === 'orders' ? '#data-po' : '#ringkasan');
+                this.$nextTick(() => window.scrollTo({ top: 0 }));
             },
             focusPoSearch() {
                 this.activeView = 'dashboard'; this.mobilePage = 'orders';
@@ -626,7 +631,7 @@
     <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v={{ filemtime(public_path('css/sbg-v2.css')) }}">
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
-<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" :class="'sbg-page-' + mobilePage" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1280px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); focusPoSearch(); }">
+<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" :class="'sbg-page-' + mobilePage" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'; if (location.hash === '#master-data') mobilePage = 'admin'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1280px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); focusPoSearch(); }">
 
     @include('components.sbg.app-navigation')
 
@@ -657,7 +662,7 @@
         @endif
 
         <section class="sbg-welcome">
-            <div><h1>Selamat datang, {{ auth()->user()->name }}! <span aria-hidden="true">👋</span></h1><p>Kelola purchase order dengan mudah dan efisien di Sentra Buah Garut.</p></div>
+            <div><h1>Selamat datang, {{ auth()->user()->name }}! <x-sbg.icon name="wave" :size="24"/></h1><p>Kelola purchase order dengan mudah dan efisien di Sentra Buah Garut.</p></div>
             <div class="sbg-welcome-actions"><button type="button" @click="isCreateModalOpen = true" class="sbg-button sbg-button-orange"><x-sbg.icon name="plus" :size="18"/>Buat PO Baru</button><button type="button" @click="$dispatch('open-analisa-modal')" class="sbg-button sbg-button-outline"><x-sbg.icon name="chart" :size="18"/>Analisa</button></div>
         </section>
         @include('components.sbg.dashboard-summary')
@@ -667,7 +672,7 @@
 
         <!-- TABEL DAERAH & AKUN WILAYAH -->
         @if(auth()->user()->isSuperAdmin() || auth()->user()->isKepalaDapur())
-            <div class="sbg-panel sbg-admin-panel overflow-hidden mt-8">
+            <div id="master-data" class="sbg-panel sbg-admin-panel overflow-hidden mt-8">
                 <div class="p-5 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-gray-50/50">
                     <div>
                         <h2 class="text-base font-extrabold text-gray-900">Daftar Daerah & Penanggung Jawab</h2>
