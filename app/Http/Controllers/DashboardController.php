@@ -487,31 +487,28 @@ class DashboardController extends Controller
 
         $region = Region::findOrFail($id);
         $oldName = $region->name;
-
-        $region->update([
-            'code' => $request->code,
-            'name' => $request->name,
-        ]);
-
         $admin = User::whereKey($request->account_id)
             ->where('region', $oldName)
-            ->whereIn('role', ['admin', 'kepala_dapur'])
-            ->first();
-        if ($admin) {
+            ->whereIn('role', ['admin', 'kepala_dapur'])->firstOrFail();
+        $validated = $request->validate([
+            'code' => 'required|string|max:50|unique:regions,code,'.$region->id,
+            'name' => 'required|string|max:255|unique:regions,name,'.$region->id,
+            'admin_name' => 'required|string|max:255',
+            'admin_email' => 'required|email|unique:users,email,'.$admin->id,
+            'password' => 'nullable|string|min:6',
+        ]);
+        DB::transaction(function () use ($request, $region, $admin, $validated) {
+            $region->update(['code' => $validated['code'], 'name' => $validated['name']]);
             $userData = [
-                'name' => $request->admin_name,
-                'email' => $request->admin_email,
+                'name' => $validated['admin_name'],
+                'email' => $validated['admin_email'],
                 'role' => $request->account_role,
-                'region' => $request->name,
+                'region' => $validated['name'],
             ];
-
-            if ($request->filled('password')) {
-                $userData['password'] = Hash::make($request->password);
-            }
-
+            if ($request->filled('password')) $userData['password'] = Hash::make($validated['password']);
             $admin->update($userData);
-        }
-
+        });
+        if ($request->expectsJson()) return response()->json(['success' => true]);
         return back()->with('success', 'Data region dan admin berhasil diperbarui');
     }
 
@@ -546,6 +543,7 @@ class DashboardController extends Controller
 
         $account->update($accountData);
 
+        if ($request->expectsJson()) return response()->json(['success' => true]);
         return back()->with('success', 'Akun Admin berhasil diperbarui.');
     }
 

@@ -20,29 +20,43 @@ class LoginPopupController extends Controller
 
         try {
             $validated = $request->validateWithBag('loginPopup', [
-                'title' => ['nullable', 'string', 'max:150'],
-                'message' => ['nullable', 'string', 'max:5000'],
+                // Explicit enable state identifies the v2.3 contract. Legacy clients
+                // retain their existing length and automatic-enable behavior.
+                'title' => ['nullable', 'string', $request->has('enabled') ? 'max:100' : 'max:150'],
+                'message' => ['nullable', 'string', $request->has('enabled') ? 'max:500' : 'max:5000'],
+                'enabled' => ['sometimes', 'boolean'],
+                '_version' => ['sometimes', 'string'],
             ]);
         } catch (ValidationException $exception) {
-            $this->queueFeedback($request, 'error', $exception->validator->errors()->first());
+            if (!$request->expectsJson()) $this->queueFeedback($request, 'error', $exception->validator->errors()->first());
             throw $exception;
         }
 
-        $setting = LoginPopupSetting::firstOrNew(['user_id' => $user->id]);
-        $setting->enabled = true;
-        $setting->title = $validated['title'] ?? null;
-        $setting->message = $validated['message'] ?? null;
-
-        if (!$setting->title && !$setting->message) {
-            $message = 'Isi judul atau pesan sebelum menyimpan popup.';
-            $this->queueFeedback($request, 'error', $message);
-            return back()->withErrors(['title' => $message], 'loginPopup')->withInput();
-        }
-
-        $setting->save();
-
-        $this->queueFeedback($request, 'success', 'Popup untuk '.$user->name.' berhasil disimpan dan diaktifkan.');
-        return back();
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $user, $validated) {
+            // Serialize writes for this account, including first-time settings.
+            User::whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $setting = LoginPopupSetting::firstOrNew(['user_id' => $user->id]);
+            if (isset($validated['_version']) && !hash_equals(\App\Support\PopupVersion::token($setting), $validated['_version'])) {
+                return response()->json([
+                    'message' => 'Konfigurasi telah berubah. Draf Anda tetap tersimpan; muat versi server untuk meninjau perubahan.',
+                    'current' => ['title' => $setting->title ?? '', 'message' => $setting->message ?? '', 'enabled' => (bool) $setting->enabled, 'version' => \App\Support\PopupVersion::token($setting)],
+                ], 409);
+            }
+            $setting->enabled = (bool) ($validated['enabled'] ?? true);
+            $setting->title = $validated['title'] ?? null;
+            $setting->message = $validated['message'] ?? null;
+            if ($setting->enabled && !$setting->title && !$setting->message) {
+                $message = 'Isi judul atau pesan sebelum menyimpan popup.';
+                if ($request->expectsJson()) return response()->json(['message' => $message, 'errors' => ['title' => [$message]]], 422);
+                $this->queueFeedback($request, 'error', $message);
+                return back()->withErrors(['title' => $message], 'loginPopup')->withInput();
+            }
+            $setting->save();
+            $message = 'Popup untuk '.$user->name.' berhasil disimpan dan '.($setting->enabled ? 'diaktifkan.' : 'dinonaktifkan.');
+            if ($request->expectsJson()) return response()->json(['success' => true, 'message' => $message]);
+            $this->queueFeedback($request, 'success', $message);
+            return back();
+        });
     }
 
     public function toggle(Request $request, User $user)
@@ -56,13 +70,14 @@ class LoginPopupController extends Controller
         try {
             $validated = $request->validateWithBag('loginPopup', ['enabled' => ['required', 'boolean']]);
         } catch (ValidationException $exception) {
-            $this->queueFeedback($request, 'error', $exception->validator->errors()->first());
+            if (!$request->expectsJson()) $this->queueFeedback($request, 'error', $exception->validator->errors()->first());
             throw $exception;
         }
         $setting = LoginPopupSetting::firstOrNew(['user_id' => $user->id]);
 
         if ($validated['enabled'] && !$setting->title && !$setting->message) {
             $message = 'Isi judul atau pesan melalui Setting Popup sebelum mengaktifkannya.';
+            if ($request->expectsJson()) return response()->json(['message' => $message, 'errors' => ['enabled' => [$message]]], 422);
             $this->queueFeedback($request, 'error', $message);
             return back()->withErrors(['enabled' => $message], 'loginPopup');
         }
@@ -70,6 +85,7 @@ class LoginPopupController extends Controller
         $setting->enabled = (bool) $validated['enabled'];
         $setting->save();
 
+        if ($request->expectsJson()) return response()->json(['success' => true, 'enabled' => $setting->enabled]);
         $this->queueFeedback($request, 'success', 'Popup untuk '.$user->name.' berhasil '.($setting->enabled ? 'diaktifkan.' : 'dinonaktifkan.'));
         return back();
     }

@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="{{ asset('js/sbg-v23.js') }}?v={{ filemtime(public_path('js/sbg-v23.js')) }}"></script>
     <script>
     function renderVerifiedQr(po) {
         const qrContainer = document.getElementById('verified-po-qr');
@@ -353,10 +354,12 @@
         }));
 
         Alpine.data('dashboardApp', () => ({
+            ...window.sbgV23(),
+            get masterResultCount() { return this.countMaster(); },
             navOpen: false, mobilePage: location.hash === '#data-po' ? 'orders' : (location.hash === '#master-data' ? 'admin' : 'home'),
             filterOpen: @json($errors->has('date_from') || $errors->has('date_to')),
             wideFilters: window.matchMedia('(min-width: 768px)').matches,
-            desktopNav: window.matchMedia('(min-width: 1280px)').matches,
+            desktopNav: window.matchMedia('(min-width: 1024px)').matches,
             detailLoading: false, detailError: '', detailRequest: 0,
             poView: window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table',
             activeView: location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard',
@@ -373,19 +376,13 @@
                 accountId: @json(old('_popup_user_id', '')),
                 accountName: @json(old('_popup_user_name', '')),
                 title: @json(old('title', '')),
-                message: @json(old('message', ''))
+                message: @json(old('message', '')),
+                enabled: @json((bool) old('enabled', true)),
+                version: ''
             },
 
-            openLoginPopupSettings(account) {
-                this.popupTarget = {
-                    accountId: account.accountId,
-                    accountName: account.accountName,
-                    title: account.title || '',
-                    message: account.message || ''
-                };
-                this.isLoginPopupSettingsOpen = true;
-            },
-            
+            openLoginPopupSettings(account) { this.v23OpenPopup(account); },
+
             // State Modal Summary
             isSummaryModalOpen: false,
             summaryModalTitle: '',
@@ -429,16 +426,7 @@
                 admin_email: ''
             },
 
-            openEditAdminModal(region, admin) {
-                this.editAdminForm.region_id = region.id;
-                this.editAdminForm.account_id = admin ? admin.id : null;
-                this.editAdminForm.code = region.code || '';
-                this.editAdminForm.name = region.name || '';
-                this.editAdminForm.role = admin ? admin.role : 'admin';
-                this.editAdminForm.admin_name = admin ? admin.name : '';
-                this.editAdminForm.admin_email = admin ? admin.email : '';
-                this.isEditAdminModalOpen = true;
-            },
+            openEditAdminModal(region, admin) { this.v23OpenEdit(region, admin); },
 
             async openDetailModal(po) {
                 const request = ++this.detailRequest;
@@ -630,9 +618,10 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v={{ filemtime(public_path('css/sbg-v2.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/sbg-v23.css') }}?v={{ filemtime(public_path('css/sbg-v23.css')) }}">
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
-<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" :class="'sbg-page-' + mobilePage" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'; if (location.hash === '#master-data') mobilePage = 'admin'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1280px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); focusPoSearch(); }">
+<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" data-account-id="{{ auth()->id() }}" x-data="dashboardApp" :class="'sbg-page-' + mobilePage + (sidebarCollapsed ? ' sbg-sidebar-collapsed' : '')" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'; if (location.hash === '#master-data') mobilePage = 'admin'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1024px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); mobilePage === 'admin' ? document.getElementById('master-search').focus() : focusPoSearch(); }">
 
     @include('components.sbg.app-navigation')
 
@@ -677,108 +666,8 @@
         @include('components.sbg.po-filter')
         @include('components.sbg.po-list')
 
-        <!-- TABEL DAERAH & AKUN WILAYAH -->
         @if(auth()->user()->isSuperAdmin() || auth()->user()->isKepalaDapur())
-            <div id="master-data" class="sbg-panel sbg-admin-panel overflow-hidden mt-8">
-                <div class="p-5 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-gray-50/50">
-                    <div>
-                        <h2 class="text-base font-extrabold text-gray-900">Daftar Daerah & Penanggung Jawab</h2>
-                        <p class="text-xs text-gray-500 mt-0.5">{{ auth()->user()->isSuperAdmin() ? 'Seluruh akun Admin dan Kepala Dapur' : 'Akun yang terdaftar di wilayah Anda' }}</p>
-                    </div>
-                    <div class="flex flex-wrap items-center gap-2">
-                        <button @click="isAddAdminModalOpen = true" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition shadow-sm flex items-center gap-1">
-                            <span>+</span> Tambah Baru
-                        </button>
-                    </div>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse text-xs sm:text-sm">
-                        <thead>
-                            <tr class="bg-gray-100/50 border-b border-gray-100 text-gray-400 uppercase text-[10px] font-bold tracking-wider">
-                                <th class="p-4">Kode</th>
-                                <th class="p-4">Nama Daerah / Dapur</th>
-                                <th class="p-4">Penanggung Jawab</th>
-                                <th class="p-4">Email / Role</th>
-                                <th class="p-4">Tanggal Dibuat</th>
-                                @if(auth()->user()->isSuperAdmin())<th class="p-4">Popup Login</th>@endif
-                                <th class="p-4 text-center">Aksi</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100">
-                            @if(auth()->user()->isSuperAdmin())
-                                @foreach($superAdmins as $superAdmin)
-                                    <tr class="hover:bg-gray-50/60 transition">
-                                        <td class="p-4 font-mono text-xs font-bold text-indigo-600">SUPER</td>
-                                        <td class="p-4 font-bold text-gray-900">{{ $superAdmin->region ?? 'Pusat' }}</td>
-                                        <td class="p-4 font-medium text-gray-800">{{ $superAdmin->name }}</td>
-                                        <td class="p-4 text-gray-600"><span class="block">{{ $superAdmin->email }}</span><span class="mt-1 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[9px] font-bold text-indigo-700">SUPER ADMIN</span></td>
-                                        <td class="p-4 text-xs text-gray-500">{{ $superAdmin->created_at?->format('d/m/Y') ?? '-' }}</td>
-                                        <td class="p-4">@include('components.login-popup-controls', ['account' => $superAdmin, 'accountPopup' => $loginPopupSettings->get($superAdmin->id)])</td>
-                                        <td class="p-4 text-center text-xs text-gray-400">-</td>
-                                    </tr>
-                                @endforeach
-                            @endif
-                            @forelse($regions as $reg)
-                                @php
-                                    $regionAccounts = \App\Models\User::where('region', $reg->name)
-                                        ->whereIn('role', ['admin', 'kepala_dapur'])
-                                        ->orderBy('name')
-                                        ->get();
-                                @endphp
-                                @forelse($regionAccounts as $account)
-                                    <tr class="hover:bg-gray-50/60 transition">
-                                        <td class="p-4 font-mono text-xs font-bold text-blue-600">{{ $reg->code ?? '-' }}</td>
-                                        <td class="p-4 font-bold text-gray-900">{{ $reg->name }}</td>
-                                        <td class="p-4 font-medium text-gray-800">{{ $account->name }}</td>
-                                        <td class="p-4 text-gray-600">
-                                            <span class="block">{{ $account->email }}</span>
-                                            <span class="mt-1 inline-block rounded-full px-2 py-0.5 text-[9px] font-bold {{ $account->isKepalaDapur() ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700' }}">
-                                                {{ $account->isKepalaDapur() ? 'KEPALA DAPUR' : 'ADMIN' }}
-                                            </span>
-                                        </td>
-                                        <td class="p-4 text-xs text-gray-500">{{ $account->created_at?->format('d/m/Y') ?? '-' }}</td>
-                                        @if(auth()->user()->isSuperAdmin())
-                                            <td class="p-4">@include('components.login-popup-controls', ['account' => $account, 'accountPopup' => $loginPopupSettings->get($account->id)])</td>
-                                        @endif
-                                        <td class="p-4 text-center">
-                                            @if(auth()->user()->isKepalaDapur() && $account->is(auth()->user()))
-                                                <button type="button" @click="isResetOwnPasswordModalOpen = true" class="rounded-lg bg-purple-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-purple-700 transition shadow-sm">
-                                                    Lupa Password
-                                                </button>
-                                            @elseif(auth()->user()->isSuperAdmin() || $account->role === 'admin')
-                                                <div class="flex items-center justify-center gap-2">
-                                                    <button type="button" @click="openEditAdminModal({{ json_encode($reg) }}, {{ json_encode($account) }})" class="rounded-lg bg-amber-500 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-amber-600 transition shadow-sm">Edit</button>
-                                                    @if(!$account->is(auth()->user()))
-                                                        <form action="{{ route('admin.account.destroy', $account) }}" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus akun ini?')">
-                                                            @csrf
-                                                            @method('DELETE')
-                                                            <button type="submit" class="rounded-lg bg-rose-600 px-3 py-1.5 text-[10px] font-bold text-white hover:bg-rose-700 transition shadow-sm">Hapus</button>
-                                                        </form>
-                                                    @endif
-                                                </div>
-                                            @else
-                                                <span class="text-[10px] font-bold text-gray-400">Tidak ada aksi</span>
-                                            @endif
-                                        </td>
-                                    </tr>
-                                @empty
-                                    <tr class="hover:bg-gray-50/60 transition">
-                                        <td class="p-4 font-mono text-xs font-bold text-blue-600">{{ $reg->code ?? '-' }}</td>
-                                        <td class="p-4 font-bold text-gray-900">{{ $reg->name }}</td>
-                                        <td colspan="{{ auth()->user()->isSuperAdmin() ? 4 : 3 }}" class="p-4 text-gray-400">Belum ada akun pada wilayah ini.</td>
-                                        <td class="p-4 text-center">-</td>
-                                    </tr>
-                                @endforelse
-                            @empty
-                                <tr>
-                                    <td colspan="{{ auth()->user()->isSuperAdmin() ? 7 : 6 }}" class="p-10 text-center text-gray-400 font-medium">Belum ada data daerah terdaftar.</td>
-                                </tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+            @include('components.sbg.master-data')
         @endif
 
     </div>
@@ -1296,64 +1185,7 @@
         </div>
     </div>
 
-    <!-- MODAL EDIT ADMIN / DAERAH -->
-    <div x-show="isEditAdminModalOpen" 
-         x-transition 
-         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4" 
-         x-cloak>
-        <div @click.away="isEditAdminModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-md rounded-xl p-6 space-y-4 border border-[#dce1d6]">
-            <div class="flex justify-between items-center pb-2 border-b border-[#dce1d6]">
-                <h3 class="text-lg font-extrabold text-[#1c3328]">{{ auth()->user()->isSuperAdmin() ? 'Edit Data Region & Admin' : 'Edit Akun Admin' }}</h3>
-                <button @click="isEditAdminModalOpen = false" class="text-[#687168] hover:text-[#435348] text-xl font-bold">&times;</button>
-            </div>
-
-            <form @if(auth()->user()->isSuperAdmin()) x-bind:action="'/admin/region/' + editAdminForm.region_id" @else x-bind:action="'/admin/account/' + editAdminForm.account_id" @endif method="POST" class="space-y-4">
-                @csrf
-                @method('PUT')
-                <input type="hidden" name="account_id" x-model="editAdminForm.account_id">
-
-                @if(auth()->user()->isSuperAdmin())
-                <div>
-                    <label class="block text-xs font-semibold text-[#435348] mb-1">Kode Region</label>
-                    <input type="text" name="code" x-model="editAdminForm.code" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-[#435348] mb-1">Nama Daerah / Dapur</label>
-                    <input type="text" name="name" x-model="editAdminForm.name" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-[#435348] mb-1">Role Akun</label>
-                    <select name="account_role" x-model="editAdminForm.role" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                        <option value="admin">Admin</option>
-                        <option value="kepala_dapur">Kepala Dapur</option>
-                    </select>
-                </div>
-                @endif
-
-                <div>
-                    <label class="block text-xs font-semibold text-[#435348] mb-1">Nama Admin</label>
-                    <input type="text" name="admin_name" x-model="editAdminForm.admin_name" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-[#435348] mb-1">Email Admin</label>
-                    <input type="email" name="admin_email" x-model="editAdminForm.admin_email" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                </div>
-
-                <div>
-                    <label class="block text-xs font-semibold text-[#435348] mb-1">Password Baru (Opsional)</label>
-                    <input type="password" name="password" placeholder="Kosongkan jika tidak diubah" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                </div>
-
-                <div class="flex justify-end gap-2 pt-3 border-t border-[#dce1d6]">
-                    <button type="button" @click="isEditAdminModalOpen = false" class="px-4 py-2 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] text-xs font-bold rounded-md transition">Batal</button>
-                    <button type="submit" class="px-4 py-2 bg-[#123d2c] hover:bg-[#0a291e] text-white text-xs font-bold rounded-md transition shadow-sm">Simpan Perubahan</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    @include('components.sbg.master-data-dialogs')
 
     @include('components.sbg.analytics-modal')
     @if($loginPopup?->enabled && $showLoginPopup)
@@ -1375,34 +1207,6 @@
         </div>
     @endif
 
-    @if(auth()->user()->isSuperAdmin())
-        <div x-show="isLoginPopupSettingsOpen" x-cloak class="sbg-modal fixed inset-0 z-[70] flex items-center justify-center overflow-y-auto bg-[#0a291e]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="login-popup-settings-title" @keydown.escape.window="isLoginPopupSettingsOpen = false">
-            <div class="sbg-modal-panel w-full max-w-lg rounded-xl bg-white p-6">
-                <div class="mb-5 flex items-center justify-between">
-                    <h2 id="login-popup-settings-title" class="text-lg font-extrabold text-[#1c3328]">Atur Popup: <span x-text="popupTarget.accountName"></span></h2>
-                    <button type="button" @click="isLoginPopupSettingsOpen = false" class="text-2xl text-[#687168] hover:text-[#435348]" aria-label="Tutup pengaturan">&times;</button>
-                </div>
-                <form method="POST" :action="'/dashboard/users/' + popupTarget.accountId + '/login-popup'" class="space-y-4">
-                    @csrf
-                    <input type="hidden" name="_popup_form" value="1">
-                    <input type="hidden" name="_popup_user_id" :value="popupTarget.accountId">
-                    <input type="hidden" name="_popup_user_name" :value="popupTarget.accountName">
-                    <div>
-                        <label for="login-popup-title-input" class="mb-1 block text-xs font-bold text-[#435348]">Judul / Header</label>
-                        <input id="login-popup-title-input" type="text" name="title" maxlength="150" x-model="popupTarget.title" class="w-full rounded-md border border-[#dce1d6] px-3 py-2.5 text-sm focus:border-[#587547] focus:outline-none">
-                    </div>
-                    <div>
-                        <label for="login-popup-message" class="mb-1 block text-xs font-bold text-[#435348]">Pesan</label>
-                        <textarea id="login-popup-message" name="message" rows="5" maxlength="5000" x-model="popupTarget.message" class="w-full rounded-md border border-[#dce1d6] px-3 py-2.5 text-sm focus:border-[#587547] focus:outline-none"></textarea>
-                    </div>
-                    <div class="flex gap-2 pt-2">
-                        <button type="button" @click="isLoginPopupSettingsOpen = false" class="flex-1 rounded-md bg-[#f7f7f0] px-4 py-2.5 text-sm font-bold text-[#435348] hover:bg-[#e9efe6]">Batal</button>
-                        <button type="submit" class="flex-1 rounded-md bg-[#123d2c] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#0a291e]">Simpan</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    @endif
     @if($popupFeedback)
         <div x-data="{ open: true }" x-show="open" x-cloak class="sbg-modal fixed inset-0 z-[90] flex items-center justify-center bg-[#0a291e]/60 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="popup-feedback-title" @keydown.escape.window="open = false">
             <div class="sbg-modal-panel w-full max-w-sm rounded-xl bg-white p-6 text-center">
