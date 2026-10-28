@@ -1,8 +1,14 @@
 // Shared keyboard behavior, without changing transaction or calculator state.
 document.addEventListener('DOMContentLoaded', () => {
+  const filters = document.getElementById('data-po');
+  const desktop = matchMedia('(min-width: 1280px)');
+  const syncFilters = () => { if (filters) filters.open = desktop.matches; };
+  syncFilters(); desktop.addEventListener('change', syncFilters);
+
   document.querySelectorAll('.sbg-modal').forEach(modal => {
     modal.setAttribute('role', modal.getAttribute('role') || 'dialog');
     modal.setAttribute('aria-modal', 'true');
+    if (!modal.hasAttribute('aria-label') && !modal.hasAttribute('aria-labelledby')) modal.setAttribute('aria-label', modal.querySelector('h2,h3,h4')?.textContent.trim() || 'Dialog');
     let previousFocus;
     const visible = () => getComputedStyle(modal).display !== 'none';
     new MutationObserver(() => {

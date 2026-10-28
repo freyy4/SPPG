@@ -27,7 +27,7 @@
             </span>
         </a>
 
-    <div class="sbg-login-shell"><section class="sbg-login-story"><span class="sbg-eyebrow">SEGAR SETIAP HARI, MUDAH DIKELOLA</span><h1>Kelola Buah<br>Lebih Mudah<br>dan <em>Terukur</em></h1><p>Satu sistem untuk mengelola purchase order, menghitung kebutuhan buah, dan memantau pembayaran mitra dapur.</p><div class="sbg-trust"><span>✓ Data real-time</span><span>✓ Mudah digunakan</span><span>✓ Aman & terpercaya</span></div><img src="{{ asset('images/sbg-orchard.svg') }}" alt="Ilustrasi kebun dan keranjang buah Sentra Buah Garut" width="600" height="270"></section>
+    <div class="sbg-login-shell"><section class="sbg-login-story"><span class="sbg-eyebrow">SEGAR SETIAP HARI, MUDAH DIKELOLA</span><h1>Kelola Buah <br>Lebih Mudah <br>dan <em>Terukur</em></h1><p>Satu sistem untuk mengelola purchase order, menghitung kebutuhan buah, dan memantau pembayaran mitra dapur.</p><div class="sbg-trust"><span>✓ Data real-time</span><span>✓ Mudah digunakan</span><span>✓ Aman & terpercaya</span></div><img src="{{ asset('images/sbg-orchard.svg') }}" alt="Ilustrasi kebun dan keranjang buah Sentra Buah Garut" width="600" height="270"></section>
     <div class="sbg-login-card w-full max-w-md rounded-xl border border-[#dce1d6] bg-white p-6 sm:p-8">
         <div class="mb-7">
             <div class="mb-5 h-1 w-10 rounded-full bg-[#f3a51d]" aria-hidden="true"></div>

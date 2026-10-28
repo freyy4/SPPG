@@ -219,9 +219,7 @@
                         .total strong{font-size:20px}.footer{text-align:center;color:#6b7280;font-size:9px;padding:0 18px 18px}
                         .verify{text-align:center;border-top:1px solid #e5e7eb;padding:18px}.verify img{width:130px;height:130px}.verified{font-size:10px;font-weight:bold;letter-spacing:2px;color:#047857;margin:8px 0 3px}
                         @media print{body{padding:0}.note{border:none;max-width:none}}
-                    </style>    <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v=2">
-    <script defer src="{{ asset('js/sbg-v2.js') }}?v=2"></script>
-</head><body>
+                    </style></head><body>
                     <section class="note"><div class="bar"></div><header class="header">
                         <h1>SENTRA BUAH GARUT</h1>
                         <p class="address">Jl. Ahmad Yani Timur Karangpawitan Garut</p>
@@ -674,6 +672,8 @@
             outline-offset: 3px;
         }
     </style>
+    <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v=2">
+    <script defer src="{{ asset('js/sbg-v2.js') }}?v=2"></script>
 </head>
 <body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'">
 
