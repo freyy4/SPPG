@@ -1,6 +1,7 @@
 <div x-cloak x-show="navOpen" class="sbg-nav-backdrop" @click="navOpen = false"></div>
-<aside id="sbg-sidebar" :inert="!navOpen && !desktopNav" class="sbg-sidebar" :class="navOpen ? 'is-open' : ''" @keydown.escape.window="navOpen = false">
+<aside id="sbg-sidebar" data-sbg-dialog :role="!desktopNav && navOpen ? 'dialog' : null" :aria-modal="!desktopNav && navOpen ? 'true' : null" aria-label="Navigasi aplikasi" :inert="!navOpen && !desktopNav" class="sbg-sidebar" :class="navOpen ? 'is-open' : ''" @keydown.escape.window="navOpen = false">
     <a href="{{ route('dashboard') }}" class="sbg-brand"><img src="{{ asset('favicon.svg') }}" alt="" width="38" height="38"><strong>Sentra Buah Garut<small>SISTEM PURCHASE ORDER</small></strong></a>
+    <button type="button" class="sbg-icon-button sbg-drawer-close" @click="navOpen = false" aria-label="Tutup navigasi" data-dialog-close><x-sbg.icon name="close"/></button>
     <p class="sbg-nav-caption">WORKSPACE</p>
     <nav aria-label="Navigasi utama">
         <a href="#ringkasan" @click="activeView = 'dashboard'; mobilePage = 'home'; navOpen = false" :class="activeView === 'dashboard' && mobilePage === 'home' ? 'is-active' : ''"><x-sbg.icon name="home"/>Dashboard</a>
@@ -13,7 +14,7 @@
     </nav>
     <div class="sbg-sidebar-bottom"><span class="sbg-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span><div><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->region ?? 'Pusat' }}</small></div><button type="button" @click="isLogoutModalOpen = true; navOpen = false"><x-sbg.icon name="logout"/>Keluar</button></div>
 </aside>
-<header class="sbg-topbar" x-data="{ accountOpen: false }">
+<header class="sbg-topbar" x-data="{ accountOpen: false }" @keydown.escape.window="accountOpen = false">
     <button type="button" class="sbg-icon-button sbg-menu-toggle" @click="navOpen = !navOpen" :aria-expanded="navOpen" aria-controls="sbg-sidebar" aria-label="Buka navigasi"><x-sbg.icon name="menu"/></button>
     <a href="{{ route('dashboard') }}" class="sbg-brand sbg-mobile-brand"><img src="{{ asset('favicon.svg') }}" alt="" width="34" height="34"><strong>Sentra Buah Garut<small>SISTEM PURCHASE ORDER</small></strong></a>
     <button type="button" class="sbg-top-search" @click="focusPoSearch()"><x-sbg.icon name="search" :size="18"/><span>Cari PO, supplier, atau nama barang…</span><kbd>⌘ K</kbd></button>

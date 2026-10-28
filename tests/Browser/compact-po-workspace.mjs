@@ -53,6 +53,7 @@ try {
         await page.waitForFunction(() => !!window.Alpine && document.body._x_dataStack?.length);
         await page.evaluate(() => document.fonts.ready);
         const dashboardMetrics = await page.evaluate(() => ({
+            fontLoaded:[...document.fonts].some(font=>font.family.includes('Plus Jakarta Sans')&&font.status==='loaded'),
             kpis:[...document.querySelectorAll('.sbg-kpi')].filter(e=>e.getClientRects().length).map(card=>({height:card.getBoundingClientRect().height,width:card.getBoundingClientRect().width})),
             exportsInKpis:[...document.querySelectorAll('.sbg-kpi')].some(card=>/Print|Download/.test(card.textContent)),
             kpiValueOverflow:[...document.querySelectorAll('.sbg-kpi-value')].filter(e=>e.getClientRects().length).some(e=>e.scrollWidth>e.clientWidth+1),
@@ -87,6 +88,7 @@ try {
         results.push({width,height,...metrics,...dashboardMetrics}); save();
         if (phase === 'after') {
             assert.equal(metrics.overflow, false, `Page overflow at ${width}`);
+            assert.equal(dashboardMetrics.fontLoaded,true,'Plus Jakarta Sans is loaded');
             assert.equal(dashboardMetrics.exportsInKpis, false, 'Exports belong in payment detail');
             assert.equal(dashboardMetrics.kpiValueOverflow, false, 'KPI values fit without wrapping');
             assert.ok(metrics.panel.top >= 0 && metrics.panel.bottom <= height+1, `Modal outside viewport at ${width}`);
@@ -185,6 +187,9 @@ try {
         await page.locator('.sbg-detail-error button').click();
         await page.waitForFunction(()=>!Alpine.$data(document.body).detailLoading&&!Alpine.$data(document.body).detailError);
         assert.equal(await page.locator('.sbg-payment-actions button').first().isDisabled(),false);
+        await page.evaluate(()=>{Alpine.$data(document.body).selectedPo.supplier_name='Koperasi Tani Buah Segar Sejahtera Cabang Garut Selatan';});
+        await page.waitForTimeout(50);
+        assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Long supplier wraps safely');
         await page.evaluate(()=>{Alpine.$data(document.body).selectedPo.notes='Catatan pengiriman tambahan. '.repeat(120);});
         await page.locator('.sbg-po-notes summary').click();
         assert.equal(await page.locator('.sbg-detail-panel').evaluate(e=>e.scrollHeight>e.clientHeight),true,'Exceptional notes can scroll');
@@ -254,7 +259,7 @@ try {
         fs.writeFileSync(path.join(evidence,'behavior-results.json'),JSON.stringify(behaviors,null,2));
         save();
         assert.deepEqual(errors, []);
-        console.log(`PASS ${results.length} viewports: dashboard, PO list, detail geometry and Escape.`);
+        console.log(`PASS ${results.length} viewports; ${Object.keys(behaviors).length} interaction/state checks; no browser errors.`);
     }
 } finally {
     await browser.close(); server.close();
