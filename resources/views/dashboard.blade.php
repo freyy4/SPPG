@@ -353,7 +353,11 @@
         }));
 
         Alpine.data('dashboardApp', () => ({
-            navOpen: false, poView: window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table',
+            navOpen: false, mobilePage: location.hash === '#data-po' ? 'orders' : 'home',
+            filterOpen: @json($errors->has('date_from') || $errors->has('date_to')),
+            wideFilters: window.matchMedia('(min-width: 768px)').matches,
+            detailLoading: false, detailError: '', detailRequest: 0,
+            poView: window.matchMedia('(max-width: 767px)').matches ? 'cards' : 'table',
             activeView: location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard',
             isDetailModalOpen: false,
             isCreateModalOpen: false,
@@ -435,18 +439,40 @@
                 this.isEditAdminModalOpen = true;
             },
 
-            openDetailModal(po) {
+            async openDetailModal(po) {
+                const request = ++this.detailRequest;
                 this.selectedPo = po;
+                this.detailError = '';
+                this.detailLoading = true;
                 this.isDetailModalOpen = true;
-
-                fetch(`/dashboard/po/${po.id}`)
-                    .then(res => res.json())
-                    .then(res => {
-                        if (res.success) {
-                            this.selectedPo = res.data;
-                        }
-                    })
-                    .catch(err => console.error("Error fetching detail:", err));
+                try {
+                    const response = await fetch(`/dashboard/po/${po.id}`, { headers: { Accept: 'application/json' } });
+                    if (!response.ok) throw new Error('Detail PO gagal dimuat. Silakan coba lagi.');
+                    const result = await response.json();
+                    if (!result.success || result.data?.id !== po.id) throw new Error('Detail PO tidak tersedia.');
+                    if (request === this.detailRequest && this.isDetailModalOpen) this.selectedPo = result.data;
+                } catch (error) {
+                    if (request === this.detailRequest) this.detailError = error.message;
+                } finally {
+                    if (request === this.detailRequest) this.detailLoading = false;
+                }
+            },
+            shortDate(value) {
+                if (!value) return '-';
+                const date = new Date(value);
+                return isNaN(date.getTime()) ? value : date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+            },
+            fruitSymbol(name) {
+                const entry = Object.entries({ semangka: 'watermelon', pisang: 'banana', mangga: 'mango', alpukat: 'avocado', apel: 'apple', pear: 'pear', pir: 'pear' }).find(([word]) => String(name || '').toLowerCase().includes(word));
+                return entry ? entry[1] : 'produce';
+            },
+            openFruitTab(tab) {
+                this.activeView = 'fruit'; this.navOpen = false;
+                this.$nextTick(() => document.getElementById('fruit-tab-' + tab)?.click());
+            },
+            focusPoSearch() {
+                this.activeView = 'dashboard'; this.mobilePage = 'orders';
+                this.$nextTick(() => { const field = document.getElementById('po-filter-search'); field.scrollIntoView({ block: 'center' }); field.focus(); });
             },
 
             openEditModal(po) {
@@ -595,149 +621,17 @@
     </script>   
     <script src="{{ asset('js/fruit-calculator.js') }}?v=11"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <style>
-        [x-cloak] { display: none !important; }
-        .dashboard-filters { padding: 20px; }
-        .dashboard-filter-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; cursor: pointer; list-style: none; }
-        .dashboard-filter-heading::-webkit-details-marker { display: none; }
-        .dashboard-filter-heading:focus-visible { outline: 2px solid #267c66; outline-offset: 6px; border-radius: 4px; }
-        .dashboard-filter-heading::after { content: '\25BE'; color: #435348; font-size: 20px; }
-        .dashboard-filters[open] > .dashboard-filter-heading::after { transform: rotate(180deg); }
-        .dashboard-filter-form { margin-top: 18px; }
-        .dashboard-filter-heading h2 { font-size: 15px; font-weight: 800; color: #1c3328; }
-        .dashboard-filter-heading p { margin-top: 4px; font-size: 12px; color: #687168; }
-        .dashboard-filter-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; }
-        .dashboard-filter-field { min-width: 0; }
-        .dashboard-filter-wide { grid-column: span 2; }
-        .dashboard-filter-field label { display: block; margin-bottom: 6px; font-size: 12px; font-weight: 600; color: #435348; }
-        .dashboard-filters .dashboard-filter-control { display: block; box-sizing: border-box; width: 100%; min-width: 0; height: 44px; margin: 0; padding: 10px 12px; border: 1px solid #cdd7cf; border-radius: 8px; background-color: #fff; color: #1c3328; font-size: 14px; }
-        .dashboard-filters select.dashboard-filter-control { padding-right: 32px; text-overflow: ellipsis; }
-        .dashboard-filter-control::placeholder { color: #829087; }
-        .dashboard-filters .dashboard-filter-control:disabled { background-color: #f0f3ef; color: #687168; cursor: not-allowed; }
-        .dashboard-filters .dashboard-filter-control:focus { outline: 2px solid #267c66; outline-offset: 2px; border-color: #267c66; box-shadow: none; }
-        .dashboard-filter-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8e4; }
-        .dashboard-filter-actions button, .dashboard-filter-actions a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border-radius: 8px; font-size: 13px; font-weight: 700; }
-        .dashboard-filter-apply { background: #123d2c; color: white; border: 1px solid #123d2c; }
-        .dashboard-filter-apply:hover { background: #0a291e; }
-        .dashboard-filter-reset { background: white; color: #435348; border: 1px solid #cdd7cf; }
-        .dashboard-filter-reset:hover { background: #edf2ef; }
-        .dashboard-filter-actions :focus-visible { outline: 2px solid #267c66; outline-offset: 3px; }
-        @media (max-width: 767px) {
-            .dashboard-filters { padding: 16px; }
-            .dashboard-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
-            .dashboard-filters .dashboard-filter-control { font-size: 16px; }
-            .dashboard-filter-actions button { flex: 1; }
-        }
-        @media (max-width: 359px) {
-            .dashboard-filter-grid { grid-template-columns: minmax(0, 1fr); }
-            .dashboard-filter-wide { grid-column: auto; }
-        }
 
-        :root { --sbg-green: #123d2c; --sbg-dark: #0a291e; --sbg-cream: #f7f7f0; --sbg-gold: #f3a51d; }
-        body { font-family: 'DM Sans', sans-serif; }
-        .sbg-heading { font-family: 'Manrope', sans-serif; }
-        .sbg-card, .sbg-panel {
-            border: 1px solid #dce1d6;
-            background: #fff;
-            box-shadow: 0 10px 30px rgba(18, 61, 44, .055);
-        }
-        .sbg-card { border-radius: 10px; }
-        .sbg-panel { border-radius: 12px; }
-        .sbg-card-interactive { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
-        .sbg-card-interactive:hover { transform: translateY(-3px); border-color: #aab7a3; box-shadow: 0 16px 34px rgba(18, 61, 44, .10); }
-
-        /* Modal surfaces follow the dashboard's Sentra Buah Garut palette. */
-        .sbg-modal { color: #1c3328; }
-        .sbg-modal-panel, .sbg-modal-confirm {
-            border: 1px solid #dce1d6;
-            border-radius: 12px;
-            background: #fff;
-            box-shadow: 0 24px 64px rgba(10, 41, 30, .22);
-        }
-        .sbg-modal-panel { max-height: calc(100dvh - 2rem); overflow-y: auto; }
-        .sbg-modal :is(h2, h3, h4):not(#printable-kitchen-note *) {
-            font-family: 'Manrope', sans-serif;
-            letter-spacing: -.025em;
-        }
-        .sbg-modal :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="hidden"]) {
-            border-color: #dce1d6;
-            border-radius: 6px;
-        }
-        .sbg-modal :is(input, select, textarea):focus {
-            border-color: #587547;
-            --tw-ring-color: rgba(88, 117, 71, .2);
-        }
-        .sbg-modal button:focus-visible {
-            outline: 2px solid #c27909;
-            outline-offset: 3px;
-        }
-    </style>
-    <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v=2">
-    <script defer src="{{ asset('js/sbg-v2.js') }}?v=2"></script>
+    <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v={{ filemtime(public_path('css/sbg-v2.css')) }}">
+    <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
-<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'">
+<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" x-data="dashboardApp" :class="'sbg-page-' + mobilePage" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); focusPoSearch(); }">
 
-    <button type="button" class="sbg-menu-toggle" @click="navOpen = !navOpen" :aria-expanded="navOpen" aria-controls="sbg-sidebar" aria-label="Buka navigasi">☰</button>
-    <div x-cloak x-show="navOpen" class="sbg-nav-backdrop" @click="navOpen = false"></div>
-    <aside id="sbg-sidebar" class="sbg-sidebar" :class="navOpen ? 'is-open' : ''" @keydown.escape.window="navOpen = false">
-        <a href="{{ route('dashboard') }}" class="sbg-brand"><img src="{{ asset('favicon.svg') }}" alt="" width="38" height="38"><strong>Sentra Buah Garut<small>SISTEM PURCHASE ORDER</small></strong></a>
-        <p class="sbg-nav-caption">WORKSPACE</p>
-        <nav aria-label="Navigasi utama">
-            <a href="#ringkasan" @click="activeView = 'dashboard'; navOpen = false" :class="activeView === 'dashboard' ? 'is-active' : ''"><span>▦</span>Dashboard</a>
-            <a href="#data-po" @click="activeView = 'dashboard'; navOpen = false"><span>▤</span>Purchase Order</a>
-            <a href="#kalkulator-buah" @click="activeView = 'fruit'; navOpen = false; $nextTick(() => document.getElementById('fruit-tab-calculate').click())"><span>▣</span>Kalkulator Buah</a>
-            <a href="#kalkulator-buah" @click="activeView = 'fruit'; navOpen = false; $nextTick(() => document.getElementById('fruit-tab-master').click())"><span>♧</span>Katalog Buah</a>
-            <a href="#kalkulator-buah" @click="activeView = 'fruit'; navOpen = false; $nextTick(() => document.getElementById('fruit-tab-archive').click())"><span>▥</span>Arsip Keputusan</a>
-        </nav>
-        <div class="sbg-sidebar-bottom"><strong>{{ auth()->user()->name }}</strong><small>{{ auth()->user()->region ?? 'Pusat' }}</small><button type="button" @click="isLogoutModalOpen = true; navOpen = false">↪ Keluar</button></div>
-    </aside>
-    <!-- NAVBAR: identitas visual mengikuti landing page Sentra Buah Garut -->
-    <header x-data="{ mobileNav: false, accountOpen: false }" class="sticky top-0 z-50 border-b border-[#dce1d6] bg-[#f7f7f0]/95 backdrop-blur-xl">
-        <div class="mx-auto flex min-h-[82px] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-            <a href="{{ route('dashboard') }}" class="flex shrink-0 items-center gap-3" aria-label="Sentra Buah Garut - dashboard">
-                <img src="{{ asset('favicon.svg') }}" alt="" class="h-11 w-11 object-contain">
-                <span class="flex flex-col">
-                    <strong class="sbg-heading text-[15px] font-extrabold tracking-tight text-[#1c3328] sm:text-[17px]">Sentra Buah Garut</strong>
-                    <small class="text-[9px] font-semibold uppercase tracking-[.2em] text-[#687168]">PT Garuta Food</small>
-                </span>
-            </a>
-
-            <nav class="hidden items-center gap-7 text-sm font-semibold text-[#435348] md:flex" aria-label="Navigasi dashboard">
-                <a @click="activeView = 'dashboard'" href="#ringkasan" class="transition hover:text-[#896016]">Ringkasan</a>
-                <a @click="activeView = 'dashboard'" href="#data-po" class="transition hover:text-[#896016]">Data PO</a>
-                <a @click="activeView = 'fruit'" href="#kalkulator-buah" :aria-current="activeView === 'fruit' ? 'page' : null" class="transition hover:text-[#896016]" :class="activeView === 'fruit' ? 'text-[#896016]' : ''">Kalkulator Buah</a>
-            </nav>
-
-            <div class="flex items-center gap-2">
-                <div class="relative hidden md:block" @click.outside="accountOpen = false">
-                    <button type="button" @click="accountOpen = !accountOpen" class="flex items-center gap-3 rounded-md border border-[#dce1d6] bg-white px-3 py-2 text-left transition hover:bg-[#edf1e8]" :aria-expanded="accountOpen.toString()">
-                        <span class="grid h-8 w-8 place-items-center rounded-full bg-[#123d2c] text-xs font-bold text-white">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
-                        <span class="hidden flex-col lg:flex"><strong class="max-w-36 truncate text-xs text-[#1c3328]">{{ auth()->user()->name }}</strong><small class="text-[10px] text-[#687168]">{{ auth()->user()->region ?? 'Pusat' }}</small></span>
-                        <svg class="h-4 w-4 text-[#687168]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m6 9 6 6 6-6"/></svg>
-                    </button>
-                    <div x-show="accountOpen" x-cloak x-transition class="absolute right-0 mt-2 w-48 overflow-hidden rounded-lg border border-[#dce1d6] bg-white p-2 shadow-xl">
-                        <button type="button" @click="accountOpen = false; isLogoutModalOpen = true" class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">Keluar dari akun</button>
-                    </div>
-                </div>
-                <button type="button" @click="navOpen = !navOpen" class="grid h-11 w-11 place-items-center rounded-md border border-[#dce1d6] text-[#123d2c] md:hidden" :aria-expanded="navOpen.toString()" aria-label="Buka menu">
-                    <svg x-show="!mobileNav" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
-                    <svg x-show="mobileNav" x-cloak class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
-                </button>
-            </div>
-        </div>
-        <nav x-show="mobileNav" x-cloak x-transition @click.outside="mobileNav = false" class="border-t border-[#dce1d6] bg-[#f7f7f0] px-4 py-4 md:hidden" aria-label="Navigasi dashboard mobile">
-            <div class="mx-auto grid max-w-7xl gap-1 text-sm font-semibold text-[#1c3328]">
-                <a @click="mobileNav = false; activeView = 'dashboard'" href="#ringkasan" class="rounded-md px-3 py-3 hover:bg-[#e9efe6]">Ringkasan</a>
-                <a @click="mobileNav = false; activeView = 'dashboard'" href="#data-po" class="rounded-md px-3 py-3 hover:bg-[#e9efe6]">Data PO</a>
-                <a @click="mobileNav = false; activeView = 'fruit'" href="#kalkulator-buah" class="rounded-md px-3 py-3 hover:bg-[#e9efe6]">Kalkulator Buah</a>
-                <button type="button" @click="mobileNav = false; isLogoutModalOpen = true" class="mt-2 rounded-md bg-[#123d2c] px-3 py-3 text-left text-white">Keluar dari akun</button>
-            </div>
-        </nav>
-    </header>
+    @include('components.sbg.app-navigation')
 
     @include('components.fruit-calculator')
 
-    <div x-show="activeView === 'dashboard'" class="sbg-workspace min-h-screen p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl mx-auto">
+    <div x-show="activeView === 'dashboard'" class="sbg-workspace">
 
         <!-- ALERT SUCCESS / ERROR -->
         @if (session('success'))
@@ -761,289 +655,18 @@
             </div>
         @endif
 
-        <!-- HEADER DASHBOARD -->
-        <div class="sbg-welcome flex flex-col sm:flex-row justify-between items-start sm:items-center gap-5 overflow-hidden bg-[#123d2c] p-6 sm:p-8 rounded-2xl border border-[#123d2c] shadow-sm text-white">
-            <div>
-                <p class="mb-2 text-[10px] font-bold uppercase tracking-[.2em] text-[#d0e0cc]">Sistem Purchase Order</p>
-                <h1 class="sbg-heading text-2xl sm:text-3xl font-extrabold tracking-tight">Selamat datang, {{ auth()->user()->name }}! 👋</h1>
-                <p class="text-xs sm:text-sm text-[#cedbca] mt-2">
-                    Selamat datang, <span class="font-bold text-white">{{ auth()->user()->name }}</span>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-[#f3a51d] text-[#0a291e] ml-1">
-                        {{ auth()->user()->region ?? 'Pusat' }}
-                    </span>
-                </p>
-            </div>
-            
-            <div class="flex items-center space-x-3 w-full sm:w-auto">
-                <button @click="isCreateModalOpen = true" class="flex-1 sm:flex-initial px-4 py-3 bg-[#f3a51d] hover:bg-[#ffc055] active:scale-95 text-[#0a291e] font-bold rounded-md text-xs transition shadow-sm flex items-center justify-center gap-1.5">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    <span>Buat PO Baru</span>
-                </button>
-
-                <button 
-                    type="button" 
-                    @click="$dispatch('open-analisa-modal')"
-                    class="px-4 py-3 border border-[#80917b] bg-white/5 text-white font-semibold rounded-md text-xs hover:bg-white/10 transition flex items-center gap-1.5 shadow-sm">
-                    <span>📊</span>
-                    <span>Analisa</span>
-                </button>
-
-            </div>
-        </div>
-
-        <!-- METRIC SUMMARY CARDS -->
-        <div id="ringkasan" class="scroll-mt-28 space-y-4">
-            <div class="flex items-end justify-between gap-4 pb-1">
-                <div>
-                    <p class="text-[10px] font-bold uppercase tracking-[.2em] text-[#74825f]">Ringkasan operasional</p>
-                    <h2 class="sbg-heading mt-1 text-xl font-extrabold text-[#1c3328]">Kondisi Purchase Order</h2>
-                </div>
-                <span class="hidden text-xs text-[#687168] sm:block">Klik kartu untuk melihat detail</span>
-            </div>
-            <!-- Baris 1: Status PO & Total Nilai -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">  
-                <!-- Total Nilai PO -->
-                <div @click="openSummaryModal('Total Nilai PO')" 
-                    class="sbg-card sbg-card-interactive cursor-pointer bg-[#123d2c] p-6 text-white group">
-                    <div class="mb-7 flex items-center justify-between"><span class="grid h-10 w-10 place-items-center rounded-md bg-[#f3a51d] font-bold text-[#0a291e]">Rp</span><span class="text-[10px] font-bold tracking-widest text-[#b9cbb4]">01</span></div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-[#cedbca]">Total Nilai PO</p>
-                    <div class="sbg-heading mt-2 text-2xl font-extrabold leading-tight break-words">
-                        <span class="text-sm font-semibold text-[#d8e3d5]">Rp</span> 
-                        <span>{{ number_format($summary['total_nilai_po'] ?? 0, 0, ',', '.') }}</span>
-                    </div>
-                    @if(auth()->user()->isSuperAdmin())
-                    <button type="button" @click.stop="$dispatch('open-po-analysis')" class="mt-4 rounded-md bg-white/15 px-3 py-2 text-xs font-bold text-white hover:bg-white/25 focus:ring-2 focus:ring-white">Analisa PO</button>
-                    @endif
-                </div>
-
-                <!-- PO Pending -->
-                <div @click="openSummaryModal('PO Pending')" 
-                    class="sbg-card sbg-card-interactive cursor-pointer p-6 group">
-                    <div class="mb-7 flex items-center justify-between"><span class="grid h-10 w-10 place-items-center rounded-md bg-[#fff3d7] text-lg text-[#a66a00]">◷</span><span class="text-[10px] font-bold tracking-widest text-[#839078]">02</span></div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-[#74825f]">PO Pending</p>
-                    <p class="sbg-heading mt-2 text-3xl font-extrabold text-[#1c3328]">{{ number_format($summary['po_pending'] ?? 0) }}</p>
-                </div>
-
-                <!-- PO Selesai -->
-                <div @click="openSummaryModal('PO Selesai')" 
-                    class="sbg-card sbg-card-interactive cursor-pointer p-6 group">
-                    <div class="mb-7 flex items-center justify-between"><span class="grid h-10 w-10 place-items-center rounded-md bg-[#e9efe6] text-lg font-bold text-[#123d2c]">✓</span><span class="text-[10px] font-bold tracking-widest text-[#839078]">03</span></div>
-                    <p class="text-xs font-bold uppercase tracking-wider text-[#74825f]">PO Selesai</p>
-                    <p class="sbg-heading mt-2 text-3xl font-extrabold text-[#1c3328]">{{ number_format($summary['po_selesai'] ?? 0) }}</p>
-                </div>
-            </div>
-
-            <!-- Baris 2: Card Fee Mitra, Bayar Supplier, & Fee KSPPG -->
-            <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-3' : 'max-w-md' }} gap-4">
-                
-                <!-- Card Fee Mitra -->
-                <div class="sbg-card sbg-card-interactive border-l-4 border-l-[#f3a51d] p-5 space-y-3">
-                    <div>
-                        <p class="text-xs font-bold uppercase tracking-wider text-[#896016]">Sisa Fee Mitra</p>
-                        <p class="sbg-heading text-2xl font-extrabold text-[#1c3328] mt-1">
-                            Rp {{ number_format($summary['total_laba_mitra'] ?? 0, 0, ',', '.') }}
-                        </p>
-                    </div>
-                    <button type="button" 
-                            @click="$dispatch('open-modal-fee-mitra', { items: allPoData, total: {{ $summary['total_laba_mitra'] ?? 0 }}, mode: 'detail' })"
-                            class="w-full bg-[#123d2c] hover:bg-[#0a291e] active:scale-95 text-white font-bold py-2.5 px-4 rounded-md text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
-                        <span>$</span> Lihat Detail
-                    </button>
-                    <div class="grid grid-cols-2 gap-2 text-xs">
-                        <button type="button" @click="$dispatch('open-modal-fee-mitra', { items: allPoData, total: {{ $summary['total_laba_mitra'] ?? 0 }}, mode: 'print' })" class="bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold py-2 rounded-md transition flex items-center justify-center gap-1 border border-[#dce1d6]">
-                            🖨️ Print
-                        </button>
-                        <button type="button" @click="$dispatch('open-modal-fee-mitra', { items: allPoData, total: {{ $summary['total_laba_mitra'] ?? 0 }}, mode: 'download' })" class="bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold py-2 rounded-md transition flex items-center justify-center gap-1 border border-[#dce1d6]">
-                            📥 Download
-                        </button>
-                    </div>
-                </div>
-
-                @if(auth()->user()->canManageFinancials())
-                    <!-- Card Bayar Supplier -->
-                    <div class="sbg-card sbg-card-interactive border-l-4 border-l-[#74825f] p-5 space-y-3">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-wider text-[#74825f]">Sisa Bayar Supplier</p>
-                            <p class="sbg-heading text-2xl font-extrabold text-[#1c3328] mt-1">
-                                Rp {{ number_format($summary['total_bayar_supplier'] ?? 0, 0, ',', '.') }}
-                            </p>
-                        </div>
-                        <button type="button" 
-                                @click="$dispatch('open-modal-supplier', { items: allPoData, total: {{ $summary['total_bayar_supplier'] ?? 0 }} , mode: 'detail', paymentType: 'supplier' })"
-                                class="w-full bg-[#123d2c] hover:bg-[#0a291e] active:scale-95 text-white font-bold py-2.5 px-4 rounded-md text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
-                            <span>$</span> Lihat Detail
-                        </button>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <button type="button" @click="$dispatch('open-modal-supplier', { items: allPoData, total: {{ $summary['total_bayar_supplier'] ?? 0 }} , mode: 'print', paymentType: 'supplier' })" class="bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold py-2 rounded-md transition flex items-center justify-center gap-1 border border-[#dce1d6]">
-                                🖨️ Print
-                            </button>
-                            <button type="button" @click="$dispatch('open-modal-supplier', { items: allPoData, total: {{ $summary['total_bayar_supplier'] ?? 0 }} , mode: 'download', paymentType: 'supplier' })" class="bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold py-2 rounded-md transition flex items-center justify-center gap-1 border border-[#dce1d6]">
-                                📥 Download
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Card Fee KSPPG -->
-                    <div class="sbg-card sbg-card-interactive border-l-4 border-l-[#123d2c] p-5 space-y-3">
-                        <div>
-                            <p class="text-xs font-bold uppercase tracking-wider text-[#576f51]">Sisa Fee KSPPG</p>
-                            <p class="sbg-heading text-2xl font-extrabold text-[#1c3328] mt-1">
-                                Rp {{ number_format($summary['total_laba_ksppg'] ?? 0, 0, ',', '.') }}
-                            </p>
-                        </div>
-                        <button type="button" 
-                                @click="$dispatch('open-modal-fee-ksppg', { items: allPoData, total: {{ $summary['total_laba_ksppg'] ?? 0 }} , mode: 'detail', paymentType: 'ksppg_fee' })"
-                                class="w-full bg-[#123d2c] hover:bg-[#0a291e] active:scale-95 text-white font-bold py-2.5 px-4 rounded-md text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
-                            <span>$</span> Lihat Detail
-                        </button>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <button type="button" @click="$dispatch('open-modal-fee-ksppg', { items: allPoData, total: {{ $summary['total_laba_ksppg'] ?? 0 }} , mode: 'print', paymentType: 'ksppg_fee' })" class="bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold py-2 rounded-md transition flex items-center justify-center gap-1 border border-[#dce1d6]">
-                                🖨️ Print
-                            </button>
-                            <button type="button" @click="$dispatch('open-modal-fee-ksppg', { items: allPoData, total: {{ $summary['total_laba_ksppg'] ?? 0 }} , mode: 'download', paymentType: 'ksppg_fee' })" class="bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold py-2 rounded-md transition flex items-center justify-center gap-1 border border-[#dce1d6]">
-                                📥 Download
-                            </button>
-                        </div>
-                    </div>
-                @endif
-            </div>
-        </div>
-
-        <!-- FILTER BAR -->
-        <details id="data-po" class="sbg-panel dashboard-filters scroll-mt-28" @if($errors->has('date_from') || $errors->has('date_to') || collect(['search', 'status', 'priority', 'region', 'date_from', 'date_to'])->contains(fn ($key) => filled(session('filter_'.$key)))) open @endif>
-            <summary class="dashboard-filter-heading">
-                <div>
-                <h2 id="dashboard-filter-title">Filter data PO</h2>
-                <p>Klik untuk membuka atau menutup pilihan filter.</p>
-                </div>
-            </summary>
-            <form method="POST" action="{{ route('dashboard') }}" class="dashboard-filter-form" aria-labelledby="dashboard-filter-title">
-            @csrf
-            <div class="dashboard-filter-grid">
-            <div class="dashboard-filter-field dashboard-filter-wide">
-                <label for="po-filter-search">Pencarian</label>
-                <input id="po-filter-search" type="search" name="search" value="{{ session('filter_search') }}" placeholder="Nama barang, supplier, atau nomor PO" class="dashboard-filter-control">
-            </div>
-            
-            <div class="dashboard-filter-field">
-                <label for="po-filter-status">Status</label>
-            <select id="po-filter-status" name="status" class="dashboard-filter-control">
-                <option value="">Semua Status</option>
-                <option value="Pending" {{ session('filter_status') == 'Pending' ? 'selected' : '' }}>Pending</option>
-                <option value="Proses" {{ session('filter_status') == 'Proses' ? 'selected' : '' }}>Proses</option>
-                <option value="Selesai" {{ session('filter_status') == 'Selesai' ? 'selected' : '' }}>Selesai</option>
-                <option value="Batal" {{ session('filter_status') == 'Batal' ? 'selected' : '' }}>Batal</option>
-            </select>
-            </div>
-
-            <div class="dashboard-filter-field">
-                <label for="po-filter-priority">Prioritas</label>
-            <select id="po-filter-priority" name="priority" class="dashboard-filter-control">
-                <option value="">Semua Prioritas</option>
-                <option value="Urgent" {{ session('filter_priority') == 'Urgent' ? 'selected' : '' }}>Urgent</option>
-                <option value="High" {{ session('filter_priority') == 'High' ? 'selected' : '' }}>High</option>
-                <option value="Normal" {{ session('filter_priority') == 'Normal' ? 'selected' : '' }}>Normal</option>
-            </select>
-            </div>
-
-            <!-- SELECT OPTION DAERAH -->
-            <div class="dashboard-filter-field dashboard-filter-wide">
-                <label for="po-filter-region">Wilayah</label>
-            <select id="po-filter-region" name="region" class="dashboard-filter-control" {{ !auth()->user()->isSuperAdmin() ? 'disabled' : '' }}>
-                <option value="">Semua Wilayah</option>
-                @foreach($regions as $reg)
-                    <option value="{{ $reg->name }}" {{ (session('filter_region') ?? auth()->user()->region) == $reg->name ? 'selected' : '' }}>
-                        {{ $reg->name }}
-                    </option>
-                @endforeach
-            </select>
-            </div>
-
-            <div class="dashboard-filter-field">
-                <label for="date_from" >Tanggal mulai</label>
-                <input id="date_from" type="date" name="date_from" value="{{ old('date_from', session('filter_date_from')) }}" class="dashboard-filter-control">
-                @error('date_from') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-            </div>
-            <div class="dashboard-filter-field">
-                <label for="date_to" >Tanggal akhir</label>
-                <input id="date_to" type="date" name="date_to" value="{{ old('date_to', session('filter_date_to')) }}" class="dashboard-filter-control">
-                @error('date_to') <p class="mt-1 text-xs text-red-600">{{ $message }}</p> @enderror
-            </div>
-
-            </div>
-            <div class="dashboard-filter-actions">
-                <button type="submit" class="dashboard-filter-apply">Terapkan filter</button>
-                <a href="{{ route('dashboard.reset') }}" class="dashboard-filter-reset">Reset</a>
-            </div>
-            </form>
-        </details>
-
-        <!-- TABLE PURCHASE ORDERS -->
-        <div class="sbg-panel sbg-po-list overflow-hidden" :class="poView === 'cards' ? 'is-cards' : ''">
-            <div class="p-5 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <h2 class="sbg-heading text-base font-extrabold text-[#1c3328]">Daftar Purchase Order</h2>
-                    <p class="mt-1 text-[11px] text-[#687168]">Klik PO untuk melihat informasi dan pembayaran.</p>
-                </div>
-                <div class="sbg-view-toggle" role="group" aria-label="Tampilan PO"><button type="button" @click="poView = 'table'" :aria-pressed="poView === 'table'">Tabel</button><button type="button" @click="poView = 'cards'" :aria-pressed="poView === 'cards'">Kartu</button></div>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse text-xs sm:text-sm">
-                    <thead>
-                        <tr class="bg-[#e9efe6] border-b border-[#dce1d6] text-[#576f51] uppercase text-[10px] font-bold tracking-wider">
-                            <th class="p-4">No. PO</th>
-                            <th class="p-4">Tanggal</th>
-                            <th class="p-4">Supplier</th>
-                            <th class="p-4">Nama Barang</th>
-                            <th class="p-4">Jumlah</th>
-                            <th class="p-4">Wilayah</th>
-                            <th class="p-4">Status</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse($purchaseOrders as $po)
-                            <tr
-                                @click="openDetailModal({{ json_encode($po) }})"
-                                @keydown.enter.prevent="openDetailModal({{ json_encode($po) }})"
-                                @keydown.space.prevent="openDetailModal({{ json_encode($po) }})"
-                                role="button"
-                                tabindex="0"
-                                aria-label="Lihat detail PO {{ $po->po_number }}"
-                                class="cursor-pointer transition hover:bg-[#f1f4ed] focus:bg-[#f1f4ed] focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#587547]"
-                            >
-                                <td data-label="No. PO" class="p-4 font-bold text-gray-900">{{ $po->po_number }}</td>
-                                <td data-label="Tanggal" class="p-4 text-gray-600">{{ \Carbon\Carbon::parse($po->transaction_date)->format('d/m/Y') }}</td>
-                                <td data-label="Supplier" class="p-4 text-gray-600">{{ $po->supplier_name ?: '-' }}</td>
-                                <td data-label="Nama Barang" class="p-4 text-gray-900 font-semibold">{{ $po->item_name }}</td>
-                                <td data-label="Jumlah" class="p-4 text-gray-600">{{ $po->quantity }} {{ $po->unit }}</td>
-                                <td data-label="Wilayah" class="p-4 text-gray-600">{{ $po->region }}</td>
-                                <td data-label="Status" class="p-4">
-                                    <span class="px-3 py-1 rounded-full text-[11px] font-bold inline-block
-                                        @if($po->status_stage == 'Selesai') bg-emerald-100 text-emerald-700 border border-emerald-200
-                                        @elseif($po->status_stage == 'Proses') bg-blue-100 text-blue-700 border border-blue-200
-                                        @elseif($po->status_stage == 'Pending') bg-amber-100 text-amber-700 border border-amber-200
-                                        @else bg-rose-100 text-rose-700 border border-rose-200 @endif">
-                                        {{ $po->status_stage }}
-                                    </span>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="p-10 text-center text-gray-400 font-medium">Belum ada data Purchase Order.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-
-            <div class="p-4 border-t border-gray-100">
-                {{ $purchaseOrders->links() }}
-            </div>
-        </div>
+        <section class="sbg-welcome">
+            <div><h1>Selamat datang, {{ auth()->user()->name }}! <span aria-hidden="true">👋</span></h1><p>Kelola purchase order dengan mudah dan efisien di Sentra Buah Garut.</p></div>
+            <div class="sbg-welcome-actions"><button type="button" @click="isCreateModalOpen = true" class="sbg-button sbg-button-orange"><x-sbg.icon name="plus" :size="18"/>Buat PO Baru</button><button type="button" @click="$dispatch('open-analisa-modal')" class="sbg-button sbg-button-outline"><x-sbg.icon name="chart" :size="18"/>Analisa</button></div>
+        </section>
+        @include('components.sbg.dashboard-summary')
+        <div class="sbg-mobile-orders-heading"><h1>Daftar Purchase Order</h1><p>Kelola dan pantau semua purchase order.</p><button type="button" @click="isCreateModalOpen = true" class="sbg-button sbg-button-orange"><x-sbg.icon name="plus" :size="16"/>Buat PO</button></div>
+        @include('components.sbg.po-filter')
+        @include('components.sbg.po-list')
 
         <!-- TABEL DAERAH & AKUN WILAYAH -->
         @if(auth()->user()->isSuperAdmin() || auth()->user()->isKepalaDapur())
-            <div class="sbg-panel overflow-hidden mt-8">
+            <div class="sbg-panel sbg-admin-panel overflow-hidden mt-8">
                 <div class="p-5 border-b border-gray-100 flex flex-wrap justify-between items-center gap-3 bg-gray-50/50">
                     <div>
                         <h2 class="text-base font-extrabold text-gray-900">Daftar Daerah & Penanggung Jawab</h2>
@@ -1171,6 +794,7 @@
                 <button @click="open = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
             </div>
 
+            <div class="sbg-payment-tools" role="group" aria-label="Tindakan rincian pembayaran"><button type="button" @click="mode = 'detail'" :aria-pressed="mode === 'detail'">Pembayaran</button><button type="button" @click="mode = 'print'" :aria-pressed="mode === 'print'"><x-sbg.icon name="print" :size="16"/>Print</button><button type="button" @click="mode = 'download'" :aria-pressed="mode === 'download'"><x-sbg.icon name="download" :size="16"/>Download</button></div>
             <div class="overflow-y-auto space-y-3 flex-1 pr-1">
                 <div x-show="selectableItems().length > 0" class="flex items-center justify-between px-1 pb-1">
                     <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#435348] cursor-pointer">
@@ -1270,6 +894,7 @@
                 <button @click="open = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
             </div>
 
+            <div class="sbg-payment-tools" role="group" aria-label="Tindakan rincian pembayaran"><button type="button" @click="mode = 'detail'" :aria-pressed="mode === 'detail'">Pembayaran</button><button type="button" @click="mode = 'print'" :aria-pressed="mode === 'print'"><x-sbg.icon name="print" :size="16"/>Print</button><button type="button" @click="mode = 'download'" :aria-pressed="mode === 'download'"><x-sbg.icon name="download" :size="16"/>Download</button></div>
             <div class="overflow-y-auto space-y-3 flex-1 pr-1">
                 <div x-show="selectableItems().length > 0" class="flex items-center justify-between px-1 pb-1">
                     <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#435348] cursor-pointer">
@@ -1366,6 +991,7 @@
                 <button @click="open = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
             </div>
 
+            <div class="sbg-payment-tools" role="group" aria-label="Tindakan rincian pembayaran"><button type="button" @click="mode = 'detail'" :aria-pressed="mode === 'detail'">Pembayaran</button><button type="button" @click="mode = 'print'" :aria-pressed="mode === 'print'"><x-sbg.icon name="print" :size="16"/>Print</button><button type="button" @click="mode = 'download'" :aria-pressed="mode === 'download'"><x-sbg.icon name="download" :size="16"/>Download</button></div>
             <div class="overflow-y-auto space-y-3 flex-1 pr-1">
                 <div x-show="selectableItems().length > 0" class="flex items-center justify-between px-1 pb-1">
                     <label class="inline-flex items-center gap-2 text-[11px] font-semibold text-[#435348] cursor-pointer">
@@ -1785,189 +1411,7 @@
         </div>
     </div>
 
-    <!-- ========================================================= -->
-    <!-- MODAL 2: DETAIL PO                                        -->
-    <!-- ========================================================= -->
-    <div role="dialog" aria-modal="true" aria-label="Detail Purchase Order" @keydown.escape.window="isDetailModalOpen = false" x-show="isDetailModalOpen"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-start sm:items-center justify-center p-2 sm:p-4"
-        x-cloak>
-
-        <div @click.away="isDetailModalOpen = false" class="sbg-detail-panel sbg-modal-panel bg-white w-full max-w-sm sm:max-w-md rounded-xl overflow-hidden p-6 space-y-4 relative max-h-[92vh] overflow-y-auto border border-[#dce1d6]">
-            
-            <!-- HEADER -->
-            <div class="flex items-start justify-between border-b border-[#dce1d6] pb-3">
-                <div class="space-y-1">
-                    <h3 class="text-xl font-extrabold text-[#1c3328] leading-none" x-text="selectedPo.item_name"></h3><p class="text-xs text-[#64756E]" x-text="selectedPo.po_number"></p>
-                    <span class="inline-block px-3 py-0.5 text-[11px] font-bold bg-[#e9efe6] text-[#123d2c] rounded-full border border-[#dce1d6]" 
-                        x-text="selectedPo.status_stage || 'Selesai'">
-                    </span>
-                </div>
-                <button @click="isDetailModalOpen = false" class="text-[#687168] hover:text-[#435348] text-xl font-bold p-1 leading-none">&times;</button>
-            </div>
-
-            <!-- DETAIL LIST -->
-            <div class="sbg-detail-columns"><section class="sbg-detail-section"><h4>Informasi PO</h4><div class="space-y-2.5 text-xs sm:text-sm">
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Tanggal</span>
-                    <span class="font-bold text-[#1c3328]" x-text="formatDate(selectedPo.transaction_date)"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Dibuat</span>
-                    <span class="font-bold text-[#1c3328] text-right" x-text="formatDate(selectedPo.created_at)"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Prioritas</span>
-                    <span class="px-2.5 py-0.5 text-xs font-bold bg-[#e9efe6] text-[#123d2c] rounded-full border border-[#dce1d6]" 
-                        x-text="selectedPo.priority || 'Normal'">
-                    </span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Tahapan</span>
-                    <span class="px-2.5 py-0.5 text-xs font-bold bg-[#e9efe6] text-[#123d2c] rounded-full border border-[#dce1d6]" 
-                        x-text="selectedPo.status_stage || 'Selesai'">
-                    </span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Kategori</span>
-                    <span class="font-bold text-[#1c3328]" x-text="selectedPo.category || '-'"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Supplier</span>
-                    <span class="font-bold text-[#1c3328]" x-text="selectedPo.supplier_name || '-'"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Qty</span>
-                    <span class="font-bold text-[#1c3328]" x-text="(selectedPo.quantity || 0) + ' ' + (selectedPo.unit || 'Kg')"></span>
-                </div>
-                </div></section><section class="sbg-detail-section"><h4>Rincian biaya</h4><div class="space-y-2.5 text-xs sm:text-sm">
-                @if(auth()->user()->canManageFinancials())
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-semibold">Harga Supplier Gudang SBG</span>
-                    <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.supplier_price)"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="rounded-md bg-blue-50 px-2 py-1 text-blue-800 font-semibold">Harga Supplier Gudang B</span>
-                    <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.supplier_price_b ?? selectedPo.supplier_price)"></span>
-                </div>
-                @endif
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Harga Maker</span>
-                    <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.maker_price)"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-semibold">Fee Mitra/unit SBG</span>
-                    <span class="font-bold text-[#1c3328]" x-text="formatRupiah(selectedPo.partner_margin)"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Qty per Gudang</span>
-                    <div class="flex flex-wrap justify-end gap-2">
-                        <span class="rounded-md bg-emerald-50 px-2 py-1 text-emerald-800 font-bold" x-text="'SBG: ' + (selectedPo.quantity_sbg ?? selectedPo.quantity ?? 0) + ' ' + (selectedPo.unit || '')"></span>
-                        <span class="rounded-md bg-blue-50 px-2 py-1 text-blue-800 font-bold" x-text="'B: ' + (selectedPo.quantity_b ?? 0) + ' ' + (selectedPo.unit || '')"></span>
-                    </div>
-                </div>
-                <!-- TOTALS -->
-                @if(auth()->user()->canManageFinancials())
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Sisa Bayar Supplier</span>
-                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_supplier_paid ? 0 : (selectedPo.total_supplier_amount ?? 0))"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Sisa Laba Mitra</span>
-                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_partner_fee_paid ? 0 : (selectedPo.total_partner_fee ?? 0))"></span>
-                </div>
-                <div class="flex justify-between items-center py-1 border-b border-gray-50">
-                    <span class="text-[#687168] font-medium">Sisa Laba KSPPG</span>
-                    <span class="font-black text-[#123d2c]" x-text="formatRupiah(selectedPo.is_ksppg_fee_paid ? 0 : (selectedPo.total_ksppg_fee ?? 0))"></span>
-                </div>
-                @endif
-                <div class="flex justify-between items-start py-1">
-                    <span class="text-[#687168] font-medium">Catatan</span>
-                    <span class="font-bold text-[#1c3328] text-right max-w-[200px]" x-text="selectedPo.notes || '-'"></span>
-                </div>
-            </div>
-
-            </section></div>
-            <!-- ACTION BUTTONS -->
-            <div class="sbg-detail-actions space-y-2 pt-2"><h4>Pembayaran & tindakan</h4>
-                @if(auth()->user()->canManageFinancials())
-                <form :action="'/dashboard/po/' + selectedPo.id + '/toggle-payment'" method="POST">
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="payment_type" value="partner_fee">
-                    <button type="submit" 
-                        :class="selectedPo.is_partner_fee_paid ? 'bg-[#123d2c] hover:bg-[#0a291e]' : 'bg-[#123d2c] hover:bg-[#123d2c]'"
-                        class="w-full py-2.5 text-white font-bold rounded-lg text-xs transition flex items-center justify-center space-x-2 shadow-sm">
-                        <span x-text="selectedPo.is_partner_fee_paid ? '✓ Lunas Mitra' : '$ Bayar Mitra'"></span>
-                    </button>
-                </form>
-
-                <form :action="'/dashboard/po/' + selectedPo.id + '/toggle-payment'" method="POST">
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="payment_type" value="supplier">
-                    <button type="submit" 
-                        :class="selectedPo.is_supplier_paid ? 'bg-[#123d2c] hover:bg-[#0a291e]' : 'bg-[#123d2c] hover:bg-[#123d2c]'"
-                        class="w-full py-2.5 text-white font-bold rounded-lg text-xs transition flex items-center justify-center space-x-2 shadow-sm">
-                        <span x-text="selectedPo.is_supplier_paid ? '✓ Lunas Supplier' : '$ Bayar Supplier'"></span>
-                    </button>
-                </form>
-
-                <form :action="'/dashboard/po/' + selectedPo.id + '/toggle-payment'" method="POST">
-                    @csrf
-                    @method('PATCH')
-                    <input type="hidden" name="payment_type" value="ksppg_fee">
-                    <button type="submit" 
-                        :class="selectedPo.is_ksppg_fee_paid ? 'bg-[#123d2c] hover:bg-[#0a291e]' : 'bg-[#123d2c] hover:bg-[#123d2c]'"
-                        class="w-full py-2.5 text-white font-bold rounded-lg text-xs transition flex items-center justify-center space-x-2 shadow-sm">
-                        <span x-text="selectedPo.is_ksppg_fee_paid ? '✓ Lunas KSPPG' : '$ Bayar KSPPG'"></span>
-                    </button>
-                </form>
-                @endif
-
-                <div class="flex space-x-2">
-                    <button type="button" 
-                        @click="openEditModal(selectedPo)" 
-                        class="flex-1 py-2.5 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-lg text-xs transition shadow-sm text-center">
-                        Edit
-                    </button>
-                    
-                    <form :action="'/dashboard/po/' + selectedPo.id" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin menghapus PO ini?')" class="w-24">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="w-full py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-lg text-xs transition shadow-sm">
-                            Hapus
-                        </button>
-                    </form>
-                </div>
-
-                <!-- DYNAMIC TRIGGER NOTA DAPUR -->
-                <button type="button" 
-                        @click="isDetailModalOpen = false; $dispatch('open-nota-dapur', { 
-                            po_number: selectedPo.po_number,
-                            verification_url: selectedPo.verification_url,
-                            item_name: selectedPo.item_name,
-                            category: selectedPo.category,
-                            quantity: selectedPo.quantity,
-                            unit: selectedPo.unit,
-                            maker_price: selectedPo.maker_price,
-                            transaction_date: formatDate(selectedPo.transaction_date),
-                            priority: selectedPo.priority || 'Normal',
-                            status_stage: selectedPo.status_stage || 'Selesai',
-                            notes: selectedPo.notes
-                        })" 
-                        class="w-full py-2.5 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-lg text-xs transition shadow-sm flex items-center justify-center gap-1.5">
-                    <span>🖨️</span> Buat Nota Dapur
-                </button>
-            </div>
-
-        </div>
-    </div>
+    @include('components.sbg.po-detail')
 
     <!-- ========================================================= -->
     <!-- MODAL 3: EDIT PO                                          -->
