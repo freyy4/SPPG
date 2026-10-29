@@ -150,7 +150,7 @@
                 return this.selectedItems().reduce((total, item) => total + this.amount(item), 0);
             },
 
-            async verificationQrDataUrl() {
+            async verificationQrDataUrl(ids = [...this.selectedIds]) {
                 const response = await fetch('{{ route('dashboard.payment.verification-link') }}', {
                     method: 'POST',
                     headers: {
@@ -158,7 +158,7 @@
                         'Accept': 'application/json',
                         'X-CSRF-TOKEN': '{{ csrf_token() }}'
                     },
-                    body: JSON.stringify({ items: this.selectedIds, type: this.paymentType })
+                    body: JSON.stringify({ items: ids, type: this.paymentType })
                 });
 
                 if (!response.ok) throw new Error('Gagal membuat tautan verifikasi.');
@@ -166,13 +166,18 @@
                 const data = await response.json();
                 const verificationUrl = new URL(data.url, window.location.origin).href;
                 this.verificationUrl = verificationUrl;
-                return createQrDataUrl(verificationUrl);
+                const qr = createQrDataUrl(verificationUrl);
+                if (!qr) throw new Error('QR verifikasi gagal dimuat. Muat ulang halaman dan coba lagi.');
+                return qr;
             },
 
             receiptLoading: false,
             async receiptData() {
-                const qr = await this.verificationQrDataUrl();
-                return { items: this.selectedItems().map(item => ({ ...item, note_subtotal: this.noteAmount(item) })), total: this.noteTotal(), qr, verificationUrl: this.verificationUrl, date: new Date().toLocaleDateString('id-ID') };
+                const items = this.selectedItems().map(item => ({ ...item, note_subtotal: this.noteAmount(item) }));
+                const total = this.noteTotal();
+                const label = this.paymentType === 'partner_fee' ? 'NOTA BUAH MITRA' : 'NOTA ' + this.config.label.toUpperCase();
+                const qr = await this.verificationQrDataUrl(items.map(item => String(item.id)));
+                return { items, total, label, qr, verificationUrl: this.verificationUrl, date: new Date().toLocaleDateString('id-ID') };
             },
             async previewSelectedNote() {
                 if (!this.selectedIds.length || this.receiptLoading) return;
@@ -228,7 +233,7 @@
 
                 let qrDataUrl = '';
                 try {
-                    qrDataUrl = await this.verificationQrDataUrl();
+                    qrDataUrl = await this.verificationQrDataUrl(selected.map(item => String(item.id)));
                 } catch (error) {
                     alert(error.message);
                     return;
@@ -286,7 +291,7 @@
                 documentPdf.setFontSize(9);
                 documentPdf.text('TOTAL HARGA', 20, totalY + 10);
                 documentPdf.setFontSize(13);
-                documentPdf.text(rupiah(this.noteTotal()), 191, totalY + 11, { align: 'right' });
+                documentPdf.text(rupiah(selected.reduce((total, item) => total + this.noteAmount(item), 0)), 191, totalY + 11, { align: 'right' });
 
                 let qrY = totalY + 24;
                 if (qrY > 245) {
@@ -600,6 +605,7 @@
 
     <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v={{ filemtime(public_path('css/sbg-v2.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sbg-v23.css') }}?v={{ filemtime(public_path('css/sbg-v23.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/fruit-calculator.css') }}?v={{ filemtime(public_path('css/fruit-calculator.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sbg-v24.css') }}?v={{ filemtime(public_path('css/sbg-v24.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sbg-v24-receipt.css') }}?v={{ filemtime(public_path('css/sbg-v24-receipt.css')) }}">
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>

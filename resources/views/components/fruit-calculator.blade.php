@@ -6,92 +6,15 @@
     x-init="$watch('activeView', value => { if (value === 'fruit' && !loaded) load(); }); if (activeView === 'fruit') load();"
     @resize.window.debounce.150ms="drawChart()"
     class="fruit-tool sbg-v24-planning mx-auto min-h-screen max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-    <style>
-        .fruit-tool { letter-spacing: 0; }
-        .fruit-tool .fruit-category { margin-top: 12px; border: 1px solid #cdd7cf; border-radius: 8px; overflow: hidden; }
-        .fruit-tool .fruit-category > summary { cursor: pointer; padding: 14px; background: #edf2ef; color: #1c3328; font-size: 14px; font-weight: 700; }
-        .fruit-tool .fruit-category-content { padding: 14px; }
-        .fruit-tool .fruit-category > summary:focus-visible { outline: 2px solid #267c66; outline-offset: -2px; }
-        .fruit-tool label { font-size: 12px; font-weight: 600; color: #435348; }
-        .fruit-tool input:not([type=checkbox]), .fruit-tool select { display: block; width: 100%; min-width: 0; margin-top: 6px; border: 1px solid #cdd7cf; border-radius: 6px; background: white; padding: 10px 12px; font-size: 14px; color: #1c3328; }
-        .fruit-tool input[type=checkbox] { width: 17px; height: 17px; accent-color: #123d2c; flex-shrink: 0; }
-        .fruit-tool button:disabled { opacity: .45; cursor: not-allowed; }
-        .fruit-tool .fruit-btn { display: inline-flex; justify-content: center; align-items: center; gap: 6px; min-height: 38px; padding: 8px 12px; border: 1px solid #cdd7cf; border-radius: 6px; background: white; font-size: 12px; font-weight: 700; }
-        .fruit-tool .fruit-primary { color: white; background: #123d2c; border-color: #123d2c; }
-        .fruit-tool th { padding: 12px; font-size: 11px; font-weight: 700; color: #576a60; background: #edf2ef; text-align: left; white-space: nowrap; }
-        .fruit-tool td { padding: 12px; border-bottom: 1px solid #e2e8e4; font-size: 12px; }
-        .fruit-tool table { width: 100%; border-collapse: collapse; }
-        .fruit-tool .fruit-tab { padding: 12px 8px; border-bottom: 2px solid transparent; font-size: 13px; font-weight: 700; }
-        .fruit-tool .fruit-tab[aria-selected=true] { border-color: #123d2c; color: #123d2c; }
-        .fruit-tool .fruit-parameter-dialog { width: min(42rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); padding: 0; border: 1px solid #dce1d6; border-radius: 8px; overflow-y: auto; }
-        .fruit-tool .fruit-parameter-dialog::backdrop { background: rgb(10 41 30 / .6); backdrop-filter: blur(3px); }
-
-        .fruit-tool { color: #1c3328; --fruit-line: #e1e7df; }
-        .fruit-tool .fruit-hero { padding: 28px; border-radius: 20px; background: #123d2c; color: #fff; }
-        .fruit-tool .fruit-hero h1 { color: #fff; font-size: clamp(24px, 3vw, 32px); letter-spacing: -.7px; }
-        .fruit-tool .fruit-hero p, .fruit-tool .fruit-hero label { color: #d0e0d4; }
-        .fruit-tool .fruit-hero .fruit-btn { color: #123d2c; }
-        .fruit-tool .fruit-hero select { min-width: 170px; }
-        .fruit-tool .fruit-subtitle { margin-top: 10px; font-size: 13px; line-height: 1.7; max-width: 520px; }
-        .fruit-tool .fruit-navigation { display: flex; gap: 4px; padding: 5px; width: fit-content; max-width: 100%; overflow-x: auto; border: 1px solid var(--fruit-line); border-radius: 12px; background: #eaf0e7; }
-        .fruit-tool .fruit-tab { padding: 11px 20px; border: 0; border-radius: 8px; white-space: nowrap; color: #526454; }
-        .fruit-tool .fruit-tab[aria-selected=true] { background: #fff; color: #123d2c; box-shadow: 0 2px 5px #123d2c0d; }
-        .fruit-tool .fruit-panel { min-width: 0; padding: 24px; border: 1px solid var(--fruit-line); border-radius: 16px; background: #fff; box-shadow: 0 3px 14px #123d2c04; }
-        .fruit-tool .fruit-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
-        .fruit-tool .fruit-section-heading h2 { font-size: 16px; font-weight: 800; }
-        .fruit-tool .fruit-section-heading p { font-size: 12px; color: #687168; margin-top: 5px; line-height: 1.6; }
-        .fruit-tool .fruit-step { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; margin-right: 8px; border-radius: 8px; background: #edf3e9; color: #426435; font-size: 12px; vertical-align: middle; }
-        .fruit-tool .fruit-count { padding: 6px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; color: #426435; background: #edf3e9; }
-        .fruit-tool input:not([type=checkbox]), .fruit-tool select { min-height: 46px; border-radius: 9px; border-color: #d9e2d7; background: #fbfcfa; font-size: 16px; font-variant-numeric: tabular-nums; transition: border-color .15s, box-shadow .15s; }
-        .fruit-tool input:focus, .fruit-tool select:focus { outline: none; border-color: #587547; box-shadow: 0 0 0 3px #58754720; background: #fff; }
-        .fruit-tool input[readonly] { background: #edf1eb; color: #687168; }
-        .fruit-tool button:focus-visible { outline: 3px solid #a7bd95; outline-offset: 3px; }
-        .fruit-tool .fruit-btn { min-height: 42px; border-radius: 9px; padding: 10px 14px; transition: background .15s, border-color .15s; }
-        .fruit-tool .fruit-btn:not(:disabled):hover { background: #edf3e9; border-color: #9cae95; }
-        .fruit-tool .fruit-primary:not(:disabled):hover { background: #20523b; border-color: #20523b; }
-        .fruit-tool .fruit-card { padding: 18px; border: 1px solid var(--fruit-line); border-radius: 12px; background: #fff; transition: border-color .15s, background .15s; }
-        .fruit-tool .fruit-card:hover { border-color: #a7b99b; }
-        .fruit-tool .fruit-card.is-selected { border-color: #587547; background: #f5f8f1; box-shadow: inset 0 0 0 1px #587547; }
-        .fruit-tool .fruit-card strong { font-size: 16px; }
-        .fruit-tool .fruit-card .fruit-price { margin-top: 12px; font-size: 18px; font-weight: 800; color: #123d2c; font-variant-numeric: tabular-nums; }
-        .fruit-tool .fruit-card .fruit-btn { width: 100%; margin-top: 16px; background: transparent; }
-        .fruit-tool .fruit-empty { padding: 24px; border: 1px dashed #d4decf; border-radius: 10px; background: #fafbf8; line-height: 1.7; }
-        .fruit-tool .overflow-x-auto, .fruit-tool .max-h-64 { border: 1px solid var(--fruit-line); border-radius: 10px; }
-        .fruit-tool th { padding: 14px 16px; background: #f2f5ee; font-size: 11px; }
-        .fruit-tool td { padding: 15px 16px; font-size: 13px; font-variant-numeric: tabular-nums; }
-        .fruit-tool tbody tr:last-child td { border-bottom: 0; }
-        .fruit-tool tbody tr:hover { background: #fafbf8; }
-        .fruit-tool .fruit-status { display: inline-block; padding: 5px 9px; border-radius: 6px; background: #f1f5ed; font-size: 11px; white-space: nowrap; }
-        .fruit-tool dl > div { padding: 14px; border-radius: 10px; background: #f6f8f3; }
-        .fruit-tool .fruit-parameter-dialog { border-radius: 16px; }
-        @media (max-width: 639px) {
-            .fruit-tool .fruit-hero { padding: 22px 18px; border-radius: 14px; }
-            .fruit-tool .fruit-panel { padding: 18px 14px; border-radius: 12px; }
-            .fruit-tool .fruit-navigation { width: 100%; }
-            .fruit-tool .fruit-tab { flex: 1; padding: 11px 10px; font-size: 12px; }
-            .fruit-tool .fruit-hero-controls { width: 100%; }
-            .fruit-tool .fruit-hero-controls label { flex: 1; }
-            .fruit-tool .fruit-section-heading { margin-bottom: 16px; }
-        }
-        @media (prefers-reduced-motion: reduce) { .fruit-tool * { transition: none !important; } }
-        .fruit-tool .fruit-price-summary { display: flex; flex-direction: column; }
-        .fruit-tool .fruit-price-summary > .flex h3 { min-width: 0; }
-        .fruit-tool .fruit-price-summary .fruit-count { max-width: 50%; white-space: normal; overflow-wrap: anywhere; }
-        .fruit-tool .fruit-sparkline { margin: 18px 0 12px; height: 64px; display: flex; align-items: center; border-bottom: 1px solid #e1e7df; }
-        .fruit-tool .fruit-sparkline svg { width: 100%; height: 56px; }
-        .fruit-tool .fruit-price-dialog { width: min(48rem, calc(100% - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; border: 0; border-radius: 16px; overflow-y: auto; color: #1c3328; box-shadow: 0 24px 80px #0a291e40; }
-        .fruit-tool .fruit-price-dialog::backdrop { background: rgb(10 41 30 / .6); backdrop-filter: blur(3px); }
-        .fruit-tool .fruit-price-dialog > .fruit-panel { border: 0; border-radius: 0; margin: 0; }
-    </style>
     <div class="fruit-hero sbg-v24-hero">
         <div><p class="sbg-v24-eyebrow">SENTRA BUAH GARUT · PERENCANAAN MENU</p><h1 class="sbg-heading" x-text="heroTitle"></h1><p class="fruit-subtitle" x-text="heroCopy"></p><span class="sbg-v24-hero-label">Buah segar, pilihan cermat.</span></div>
         <picture aria-hidden="true"><source media="(max-width: 639px)" srcset="{{ asset('images/sbg-v24/farmer-480.webp') }}"><img src="{{ asset('images/sbg-v24/farmer-900.webp') }}" width="900" height="600" alt="" onerror="this.hidden=true"></picture>
     </div>
     <div class="sbg-v24-planning-toolbar">
-    <div class="fruit-navigation" role="tablist" aria-label="Kalkulator buah">
-        <button id="fruit-tab-calculate" class="fruit-tab" role="tab" aria-controls="fruit-calculate" :aria-selected="tab === 'calculate'" @click="tab = 'calculate'" :disabled="busy || loading">Kalkulator</button>
-        <button id="fruit-tab-master" class="fruit-tab" role="tab" aria-controls="fruit-master" :aria-selected="tab === 'master'" @click="tab = 'master'; $nextTick(() => drawChart())" :disabled="busy || loading">Katalog Buah</button>
-        <button id="fruit-tab-archive" class="fruit-tab" role="tab" aria-controls="fruit-archive" :aria-selected="tab === 'archive'" @click="tab = 'archive'; loadArchive(1)" :disabled="busy || loading">Arsip Keputusan</button>
+    <div class="fruit-navigation" @keydown="movePlanningTab($event)" role="tablist" aria-label="Kalkulator buah">
+        <button id="fruit-tab-calculate" class="fruit-tab" role="tab" aria-controls="fruit-calculate" :aria-selected="tab === 'calculate'" :tabindex="tab === 'calculate' ? 0 : -1" @click="tab = 'calculate'" :disabled="busy || loading">Kalkulator</button>
+        <button id="fruit-tab-master" class="fruit-tab" role="tab" aria-controls="fruit-master" :aria-selected="tab === 'master'" :tabindex="tab === 'master' ? 0 : -1" @click="tab = 'master'; $nextTick(() => drawChart())" :disabled="busy || loading">Katalog Buah</button>
+        <button id="fruit-tab-archive" class="fruit-tab" role="tab" aria-controls="fruit-archive" :aria-selected="tab === 'archive'" :tabindex="tab === 'archive' ? 0 : -1" @click="tab = 'archive'; loadArchive(1)" :disabled="busy || loading">Arsip Keputusan</button>
     </div>
         <div class="fruit-hero-controls flex items-end gap-2">
             @if(auth()->user()->isSuperAdmin())
@@ -184,7 +107,7 @@
             </form>
             </dialog>
         </template>
-        <div class="fruit-panel">
+        <div class="fruit-panel" x-ref="comparisonPanel">
             <div class="fruit-section-heading"><div><h2><span class="fruit-step">03</span>Perbandingan kebutuhan</h2><p>Bandingkan biaya dan sisa anggaran, lalu pilih buah untuk menu harian.</p></div></div>
             <p x-show="!validParameters" class="fruit-empty text-sm text-[#687168]">Tanggal, anggaran, dan jumlah PM belum lengkap atau tidak valid. Total PM minimal 1.</p>
             <p x-show="validParameters && !selectedIds.length" class="fruit-empty text-sm text-[#687168]">Belum ada kandidat dipilih.</p>
@@ -198,7 +121,7 @@
                 </div>
             </template>
         </div>
-        <div class="sbg-v24-recommendation" x-show="results.length" role="status"><div><span>KANDIDAT TERMURAH DALAM ANGGARAN</span><strong x-text="recommendation ? recommendation.name + ' · ' + money(recommendation.cost) : 'Belum ada kandidat dalam anggaran'"></strong><small>Biaya untuk satu pilihan buah.</small></div><button type="button" class="fruit-btn" x-show="recommendation" @click="choose(recommendation)" :disabled="busy || loading">Pilih & simpan keputusan →</button></div>
+        <div class="sbg-v24-recommendation" x-show="results.length && comparisonVisible" role="status"><div><span>KANDIDAT TERMURAH DALAM ANGGARAN</span><strong x-text="recommendation ? recommendation.name + ' · ' + money(recommendation.cost) : 'Belum ada kandidat dalam anggaran'"></strong><small>Biaya untuk satu pilihan buah.</small></div><button type="button" class="fruit-btn" x-show="recommendation" @click="choose(recommendation)" :disabled="busy || loading">Pilih & simpan keputusan →</button></div>
     </div>
 
     <div id="fruit-master" role="tabpanel" aria-labelledby="fruit-tab-master" x-show="tab === 'master'" class="space-y-6">

@@ -22,8 +22,10 @@ const server=http.createServer((req,res)=>{
 await new Promise(r=>server.listen(0,'127.0.0.1',r)); origin=`http://127.0.0.1:${server.address().port}`;
 const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
 const page=await browser.newPage(); const errors=[],results=[];
-page.on('pageerror',e=>errors.push(e.message));
-const matrix=phase==='before'?[[1440,900],[1366,768],[390,844]]:[[1920,1080],[1440,900],[1366,768],[1280,720],[1024,768],[834,1194],[430,932],[390,844],[360,800]];
+page.on('pageerror',e=>errors.push(e.stack||e.message));
+page.on('console',msg=>{if(msg.text().startsWith('REJECTION'))console.log(msg.text());});
+await page.addInitScript(()=>window.addEventListener('unhandledrejection',e=>console.error('REJECTION '+JSON.stringify(e.reason,Object.getOwnPropertyNames(e.reason||{})))));
+const matrix=process.env.SBG_BROWSER_FUNCTIONAL==='only'?[]:phase==='before'?[[1440,900],[1366,768],[390,844]]:[[1920,1080],[1440,900],[1366,768],[1280,720],[1024,768],[834,1194],[430,932],[390,844],[360,800]];
 async function capture(surface,width,height){await page.waitForTimeout(260);await page.screenshot({path:path.join(output,`${surface}-${width}.png`)});const metric=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth+1,dialogs:[...document.querySelectorAll('.sbg-modal')].filter(e=>e.getClientRects().length).map(e=>{const p=e.querySelector('.sbg-modal-panel');const r=p?.getBoundingClientRect();return r?{top:r.top,bottom:r.bottom,width:r.width}:null}).filter(Boolean)}));results.push({surface,width,height,...metric});if(phase==='after'){assert.equal(metric.overflow,false,`${surface} page overflow ${width}`);for(const d of metric.dialogs)assert.ok(d.top>=-1&&d.bottom<=height+1,`${surface} dialog outside ${width}: ${JSON.stringify(d)}`);}}
 try{
 for(const [width,height]of matrix){
@@ -36,9 +38,9 @@ for(const [width,height]of matrix){
  await capture('calculator',width,height);
  for(const [tab,surface]of [['master','catalog'],['archive','archive']]){await page.evaluate(async tab=>{const f=Alpine.$data(document.querySelector('.fruit-tool'));f.tab=tab;if(tab==='archive')await f.loadArchive(1);},tab);await capture(surface,width,height);}
  if(phase==='after'){
- console.log('State',width,await page.evaluate(()=>({rootKeys:Object.keys(Alpine.$data(document.body)),fruitReady:Alpine.$data(document.querySelector('.fruit-tool')).loaded})));
- await page.evaluate(()=>{const data=Alpine.$data(document.body);const items=data.summaryPoData.slice(0,10);window.dispatchEvent(new CustomEvent('open-partner-receipt',{detail:{items:items.map(i=>({...i,note_subtotal:i.ui_po_value})),total:items.reduce((s,i)=>s+i.ui_po_value,0),qr:'',verificationUrl:'',date:'29/10/2026'}}));});await capture('receipt',width,height);await page.keyboard.press('Escape');
+ await page.evaluate(async()=>{const data=Alpine.$data(document.body); const modal=Alpine.$data(document.querySelector('.sbg-fee-overlay')); modal.openModal({items:data.allPoData.slice(0,10),mode:'print',paymentType:'partner_fee'});modal.selectedIds=modal.items.map(i=>String(i.id));await modal.previewSelectedNote();});await capture('receipt',width,height);await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
  }
 }
+if(process.env.SBG_BROWSER_FUNCTIONAL){const {verify}=await import('./sbg-v24-functional.mjs');await verify({page,browser,origin,root});}
 assert.deepEqual(errors,[],'No runtime errors');
-}finally{fs.writeFileSync(path.join(root,`${phase}-results.json`),JSON.stringify({results,errors},null,2));await browser.close();server.close();}
+}finally{fs.writeFileSync(path.join(root,`${phase}${process.env.SBG_BROWSER_FUNCTIONAL==='only'?'-functional-runtime':''}-results.json`),JSON.stringify({results,errors},null,2));await browser.close();server.close();}

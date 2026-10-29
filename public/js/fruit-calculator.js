@@ -9,7 +9,9 @@ document.addEventListener('alpine:init', () => {
             this.$nextTick(() => {
                 const observer = new ResizeObserver(() => this.drawChart());
                 observer.observe(this.$refs.priceChart.parentElement);
-                this.stopChartObserver = () => observer.disconnect();
+                const comparison = new IntersectionObserver(entries => { this.comparisonVisible = entries[0].isIntersecting; }, { threshold: 0 });
+                comparison.observe(this.$refs.comparisonPanel);
+                this.stopChartObserver = () => { observer.disconnect(); comparison.disconnect(); };
             });
         },
         destroy() {
@@ -59,7 +61,7 @@ document.addEventListener('alpine:init', () => {
         async changeRegion() {
             if (this.priceDetailOpen) this.closePriceDetail();
             this.selectedIds = []; this.editor = null; this.report = null; this.catalogPage = 1;
-            this.historyId = ''; this.history = []; this.historyRequest++; this.archive = []; this.pendingDecision = null;
+            this.historyId = ''; this.history = []; this.historyRequest++; this.archiveRequest++; this.archive = []; this.pendingDecision = null;
             this.message = ''; await this.load();
             if (this.tab === 'archive') await this.loadArchive(1);
         },
