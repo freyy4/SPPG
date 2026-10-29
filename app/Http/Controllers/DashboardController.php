@@ -144,6 +144,14 @@ class DashboardController extends Controller
 
         // 7. Data Ringkasan Financial (Untuk Widget Dashboard)
         $allFetchedPO = (clone $query)->get();
+        // Read-only presentation projection of the same filtered PO query as the KPI.
+        $summaryPoData = $allFetchedPO->map(fn ($po) => [
+            'id' => $po->id, 'po_number' => $po->po_number,
+            'item_name' => $po->item_name, 'transaction_date' => $po->transaction_date,
+            'category' => $po->category, 'quantity' => $po->quantity, 'unit' => $po->unit,
+            'maker_price' => $po->maker_price, 'status_stage' => $po->status_stage,
+            'ui_po_value' => $po->quantity * $po->maker_price,
+        ])->values();
         $summary = [
             'total_po'             => $allFetchedPO->count(),
             'po_pending'           => $allFetchedPO->where('status_stage', 'Pending')->count(),
@@ -170,7 +178,7 @@ class DashboardController extends Controller
         $showLoginPopup = $request->session()->pull('show_login_popup', false) && $loginPopup?->enabled;
         $popupFeedback = $request->session()->pull('popup_feedback');
 
-        return view('dashboard', compact('purchaseOrders', 'summary', 'regions', 'admins', 'loginPopup', 'loginPopupSettings', 'popupPerUserReady', 'superAdmins', 'showLoginPopup', 'popupFeedback'));
+        return view('dashboard', compact('purchaseOrders', 'summary', 'summaryPoData', 'regions', 'admins', 'loginPopup', 'loginPopupSettings', 'popupPerUserReady', 'superAdmins', 'showLoginPopup', 'popupFeedback'));
     }
 
     // Method tambahan untuk mereset filter

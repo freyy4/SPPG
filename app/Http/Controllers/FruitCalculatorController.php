@@ -216,8 +216,15 @@ class FruitCalculatorController extends Controller
     public function decisions(Request $request)
     {
         $region = $this->region($request);
-        $request->validate(['page' => ['sometimes', 'integer', 'min:1']]);
-        $page = DB::table('fruit_decisions')->when($region !== self::ALL_REGIONS, fn ($query) => $query->where('region', $region))->orderByDesc('id')->paginate(15);
+        $request->validate(['page' => ['sometimes', 'integer', 'min:1'], 'search' => ['nullable', 'string', 'max:100']]);
+        $search = trim($request->input('search', ''));
+        $page = DB::table('fruit_decisions')
+            ->when($region !== self::ALL_REGIONS, fn ($query) => $query->where('region', $region))
+            ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
+                $query->where('decision_date', 'like', '%'.$search.'%')
+                    ->orWhere('snapshot', 'like', '%'.$search.'%');
+            }))
+            ->orderByDesc('id')->paginate(15)->withQueryString();
         $page->getCollection()->transform(function ($row) {
             $row->snapshot = json_decode($row->snapshot, true, 512, JSON_THROW_ON_ERROR);
 
