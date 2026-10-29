@@ -1,5 +1,5 @@
 @if($loginPopup?->enabled && $showLoginPopup)
-<div x-data="{ open: true }" x-show="open" x-cloak x-transition.opacity.duration.200ms class="sbg-modal sbg-v24-overlay sbg-v24-announcement-overlay" role="dialog" aria-modal="true" aria-labelledby="login-popup-title" @keydown.escape.window="open = false">
+<div x-data="{ open: true }" x-show="open" x-cloak class="sbg-modal sbg-v24-overlay sbg-v24-announcement-overlay" role="dialog" aria-modal="true" aria-labelledby="login-popup-title" @keydown.escape.window="open = false">
     <section class="sbg-modal-panel sbg-v24-announcement">
         <button type="button" @click="open = false" class="sbg-icon-button sbg-v24-announcement-close" aria-label="Tutup pengumuman" data-dialog-close><x-sbg.icon name="close"/></button>
         <div class="sbg-v24-announcement-body"><div class="sbg-v24-announcement-brand"><img src="{{ asset('favicon.svg') }}" alt="Logo aplikasi" width="36" height="36"><span>Sentra Buah Garut<small>SEGAR • BERKUALITAS • TERPERCAYA</small></span></div>

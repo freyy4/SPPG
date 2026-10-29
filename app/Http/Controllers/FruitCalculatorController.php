@@ -222,7 +222,8 @@ class FruitCalculatorController extends Controller
             ->when($region !== self::ALL_REGIONS, fn ($query) => $query->where('region', $region))
             ->when($search !== '', fn ($query) => $query->where(function ($query) use ($search) {
                 $query->where('decision_date', 'like', '%'.$search.'%')
-                    ->orWhere('snapshot', 'like', '%'.$search.'%');
+                    ->orWhere('snapshot->selected->name', 'like', '%'.$search.'%')
+                    ->orWhere('snapshot->author', 'like', '%'.$search.'%');
             }))
             ->orderByDesc('id')->paginate(15)->withQueryString();
         $page->getCollection()->transform(function ($row) {

@@ -209,6 +209,7 @@
                         const sheet = printWindow.document.querySelector('link');
                         if (sheet.sheet) return resolve();
                         sheet.onload = resolve; sheet.onerror = resolve;
+                        printWindow.setTimeout(resolve, 2500);
                     });
                     printWindow.focus();
                     printWindow.onafterprint = () => printWindow.close();

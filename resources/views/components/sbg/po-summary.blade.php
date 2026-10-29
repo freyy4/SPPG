@@ -1,4 +1,4 @@
-<div x-show="isSummaryModalOpen" x-cloak x-transition.opacity.duration.200ms class="sbg-modal sbg-v24-overlay" role="dialog" aria-modal="true" aria-labelledby="sbg-summary-title">
+<div x-show="isSummaryModalOpen" x-cloak class="sbg-modal sbg-v24-overlay" role="dialog" aria-modal="true" aria-labelledby="sbg-summary-title">
     <section class="sbg-modal-panel sbg-v24-summary" @click.outside="isSummaryModalOpen = false">
         <header class="sbg-v24-modal-header"><span class="sbg-v24-modal-icon"><x-sbg.icon name="po" :size="28"/></span><div><p class="sbg-v24-eyebrow">RINGKASAN PURCHASE ORDER</p><h2 id="sbg-summary-title" x-text="summaryModalTitle"></h2><p>Seluruh transaksi sesuai filter yang aktif.</p></div><button type="button" class="sbg-icon-button" @click="isSummaryModalOpen = false" aria-label="Tutup ringkasan PO" data-dialog-close><x-sbg.icon name="close"/></button></header>
         <div class="sbg-v24-summary-list" tabindex="0" aria-label="Daftar PO sesuai filter">

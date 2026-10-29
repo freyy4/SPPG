@@ -12,6 +12,7 @@ fs.mkdirSync(output,{recursive:true});
 let origin;
 const server=http.createServer((req,res)=>{
  const url=new URL(req.url,origin); res.setHeader('Cache-Control','no-store');
+ if(url.pathname==='/print-fixture'){res.setHeader('Content-Type','text/html');return res.end('<!DOCTYPE html><html><body></body></html>');}
  if(url.pathname==='/dashboard'){res.setHeader('Content-Type','text/html'); return res.end(fs.readFileSync(path.join(fixtures,'dashboard.html'),'utf8').replaceAll('https://sbg.my.id',origin).replaceAll('http://localhost',origin));}
  if(url.pathname.includes('verification-link')){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({url:origin+'/verification/synthetic?signature=fixture-only'}));}
  if(url.pathname.startsWith('/dashboard/fruit-calculator')){res.setHeader('Content-Type','application/json'); return res.end(fs.readFileSync(path.join(fixtures,url.pathname.endsWith('/decisions')?'archive.json':'calculator.json')));}
