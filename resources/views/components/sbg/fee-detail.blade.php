@@ -45,6 +45,9 @@
             <div class="sbg-fee-summary"><span class="sbg-v22-header-icon"><x-sbg.icon name="po" :size="26"/></span><div><p>Total Data Dipilih</p><strong x-text="formatRupiah(selectedTotal())"></strong></div></div>
             <div class="sbg-fee-footer-actions">
                 <button type="button" @click="open = false" class="sbg-button sbg-fee-dismiss">Tutup</button>
+                @if($feeType === 'partner_fee')
+                <button x-show="mode !== 'detail'" type="button" @click="previewSelectedNote()" :disabled="selectedIds.length === 0 || receiptLoading" class="sbg-button sbg-button-outline" x-text="receiptLoading ? 'Menyiapkan…' : 'Pratinjau nota'"></button>
+                @endif
                 <button x-show="mode === 'print'" type="button" @click="printSelectedNote()" :disabled="selectedIds.length === 0" class="sbg-button sbg-button-primary"><x-sbg.icon name="print"/>Print Nota</button>
                 <button x-show="mode === 'download'" type="button" @click="downloadSelectedPdf()" :disabled="selectedIds.length === 0" class="sbg-button sbg-button-primary"><x-sbg.icon name="download"/>Download PDF</button>
                 <button x-show="mode === 'detail'" type="button" @click="sendToWhatsApp()" :disabled="selectedIds.length === 0" class="sbg-button sbg-button-primary"><x-sbg.icon name="whatsapp" :size="22"/>Kirim ke WhatsApp</button>

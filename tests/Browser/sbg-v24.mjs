@@ -36,6 +36,7 @@ for(const [width,height]of matrix){
  await capture('calculator',width,height);
  for(const [tab,surface]of [['master','catalog'],['archive','archive']]){await page.evaluate(async tab=>{const f=Alpine.$data(document.querySelector('.fruit-tool'));f.tab=tab;if(tab==='archive')await f.loadArchive(1);},tab);await capture(surface,width,height);}
  if(phase==='after'){
+ console.log('State',width,await page.evaluate(()=>({rootKeys:Object.keys(Alpine.$data(document.body)),fruitReady:Alpine.$data(document.querySelector('.fruit-tool')).loaded})));
  await page.evaluate(()=>{const data=Alpine.$data(document.body);const items=data.summaryPoData.slice(0,10);window.dispatchEvent(new CustomEvent('open-partner-receipt',{detail:{items:items.map(i=>({...i,note_subtotal:i.ui_po_value})),total:items.reduce((s,i)=>s+i.ui_po_value,0),qr:'',verificationUrl:'',date:'29/10/2026'}}));});await capture('receipt',width,height);await page.keyboard.press('Escape');
  }
 }

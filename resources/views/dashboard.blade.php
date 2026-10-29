@@ -165,9 +165,22 @@
 
                 const data = await response.json();
                 const verificationUrl = new URL(data.url, window.location.origin).href;
+                this.verificationUrl = verificationUrl;
                 return createQrDataUrl(verificationUrl);
             },
 
+            receiptLoading: false,
+            async receiptData() {
+                const qr = await this.verificationQrDataUrl();
+                return { items: this.selectedItems().map(item => ({ ...item, note_subtotal: this.noteAmount(item) })), total: this.noteTotal(), qr, verificationUrl: this.verificationUrl, date: new Date().toLocaleDateString('id-ID') };
+            },
+            async previewSelectedNote() {
+                if (!this.selectedIds.length || this.receiptLoading) return;
+                this.receiptLoading = true;
+                try { this.$dispatch('open-partner-receipt', await this.receiptData()); }
+                catch (error) { alert(error.message + ' Silakan coba lagi.'); }
+                finally { this.receiptLoading = false; }
+            },
             async printSelectedNote() {
                 const selected = this.selectedItems();
 
@@ -182,57 +195,22 @@
                     return;
                 }
 
-                const safe = value => String(value ?? '-').replace(/[&<>'"]/g, character => ({
-                    '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#039;', '"': '&quot;'
-                })[character]);
-                const rupiah = value => 'Rp ' + Number(value || 0).toLocaleString('id-ID');
-                let qrDataUrl = '';
                 try {
-                    qrDataUrl = await this.verificationQrDataUrl();
+                    const data = await this.receiptData();
+                    printWindow.document.write(SbgReceipt.documentHtml(data));
+                    printWindow.document.close();
+                    await Promise.all([...printWindow.document.images].map(image => image.decode().catch(() => {})));
+                    await new Promise(resolve => {
+                        const sheet = printWindow.document.querySelector('link');
+                        if (sheet.sheet) return resolve();
+                        sheet.onload = resolve; sheet.onerror = resolve;
+                    });
+                    printWindow.focus();
+                    printWindow.onafterprint = () => printWindow.close();
+                    printWindow.print();
                 } catch (error) {
-                    printWindow.close();
-                    alert(error.message);
-                    return;
+                    printWindow.close(); alert(error.message);
                 }
-                const qrMarkup = qrDataUrl ? '<img src="' + qrDataUrl + '" alt="QR Verified">' : '';
-                const rows = selected.map((item, index) => {
-                    const subtotal = this.noteAmount(item);
-                    return `<tr>
-                        <td>${index + 1}</td>
-                        <td><strong>${safe(item.item_name)}</strong><small>${safe(item.po_number)}</small></td>
-                        <td>${safe(item.quantity)} ${safe(item.unit || '')}</td>
-                        <td>${rupiah(item.maker_price)}</td>
-                        <td class="right"><strong>${rupiah(subtotal)}</strong></td>
-                    </tr>`;
-                }).join('');
-
-                printWindow.document.write(`<!DOCTYPE html>
-                    <html lang="id"><head><meta charset="UTF-8"><title>SISTEM PO</title>
-                    <style>
-                        *{box-sizing:border-box} body{margin:0;padding:28px;font-family:Arial,sans-serif;color:#111827;font-size:12px}
-                        .note{max-width:800px;margin:auto;border:1px solid #d1d5db;border-radius:14px;overflow:hidden}
-                        .bar{height:8px;background:#111827}.header{text-align:center;padding:22px;border-bottom:1px solid #e5e7eb}
-                        h1{font-size:20px;margin:4px 0}.label{font-size:9px;letter-spacing:2px;color:#6b7280;font-weight:bold}
-                        .address{color:#6b7280;margin:0}.meta{display:flex;justify-content:space-between;padding:14px 18px;background:#f9fafb}
-                        table{width:100%;border-collapse:collapse} th{background:#f3f4f6;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.5px}
-                        th,td{padding:11px;border-bottom:1px solid #e5e7eb} td small{display:block;color:#6b7280;margin-top:3px}.right{text-align:right}
-                        .total{display:flex;justify-content:space-between;align-items:center;margin:18px;padding:16px;background:#111827;color:white;border-radius:10px}
-                        .total strong{font-size:20px}.footer{text-align:center;color:#6b7280;font-size:9px;padding:0 18px 18px}
-                        .verify{text-align:center;border-top:1px solid #e5e7eb;padding:18px}.verify img{width:130px;height:130px}.verified{font-size:10px;font-weight:bold;letter-spacing:2px;color:#047857;margin:8px 0 3px}
-                        @media print{body{padding:0}.note{border:none;max-width:none}}
-                    </style></head><body>
-                    <section class="note"><div class="bar"></div><header class="header">
-                        <h1>SENTRA BUAH GARUT</h1>
-                        <p class="address">Jl. Ahmad Yani Timur Karangpawitan Garut</p>
-                    </header><div class="meta"><span>Tanggal cetak: <strong>${new Date().toLocaleDateString('id-ID')}</strong></span><span>${selected.length} barang</span></div>
-                    <table><thead><tr><th>No.</th><th>Item / Nomor PO</th><th>Qty</th><th>Harga</th><th class="right">Subtotal</th></tr></thead>
-                    <tbody>${rows}</tbody></table>
-                    <div class="total"><span>TOTAL</span><strong>${rupiah(this.noteTotal())}</strong></div>
-                    <div class="verify">${qrMarkup}<p class="verified">✓ VERIFIED</p><p>Scan untuk melihat daftar barang terpilih</p></div>
-                    <p class="footer">Dokumen ini dibuat melalui sistem Purchase Order Sentra Buah Garut.</p></section>
-                    <script>window.onload=()=>{window.print();window.onafterprint=()=>window.close()}<\/script>
-                    </body></html>`);
-                printWindow.document.close();
             },
 
             async downloadSelectedPdf() {
@@ -270,7 +248,7 @@
                     ];
                 });
 
-                documentPdf.setFillColor(17, 24, 39);
+                documentPdf.setFillColor(11, 93, 68);
                 documentPdf.rect(0, 0, 210, 5, 'F');
                 documentPdf.setFont('helvetica', 'bold');
                 documentPdf.setFontSize(17);
@@ -290,7 +268,7 @@
                     body: rows,
                     theme: 'grid',
                     styles: { font: 'helvetica', fontSize: 9, cellPadding: 3, textColor: [17, 24, 39] },
-                    headStyles: { fillColor: [31, 41, 55], textColor: [255, 255, 255], fontStyle: 'bold' },
+                    headStyles: { fillColor: [11, 93, 68], textColor: [255, 255, 255], fontStyle: 'bold' },
                     columnStyles: {
                         0: { cellWidth: 12, halign: 'center' },
                         2: { cellWidth: 26 },
@@ -299,13 +277,14 @@
                     }
                 });
 
-                const totalY = documentPdf.lastAutoTable.finalY + 8;
-                documentPdf.setFillColor(17, 24, 39);
-                documentPdf.roundedRect(120, totalY, 76, 16, 2, 2, 'F');
+                let totalY = documentPdf.lastAutoTable.finalY + 8;
+                if (totalY > 268) { documentPdf.addPage(); totalY = 20; }
+                documentPdf.setFillColor(11, 93, 68);
+                documentPdf.roundedRect(14, totalY, 182, 16, 2, 2, 'F');
                 documentPdf.setTextColor(255, 255, 255);
                 documentPdf.setFont('helvetica', 'bold');
                 documentPdf.setFontSize(9);
-                documentPdf.text('TOTAL HARGA', 125, totalY + 6);
+                documentPdf.text('TOTAL HARGA', 20, totalY + 10);
                 documentPdf.setFontSize(13);
                 documentPdf.text(rupiah(this.noteTotal()), 191, totalY + 11, { align: 'right' });
 
@@ -400,16 +379,17 @@
             },
 
             allPoData: @json($purchaseOrders->items()),
+            summaryPoData: @json($summaryPoData),
 
             openSummaryModal(type) {
                 this.summaryModalTitle = type;
                 
                 if (type === 'Total Nilai PO') {
-                    this.summaryModalItems = this.allPoData;
+                    this.summaryModalItems = this.summaryPoData;
                 } else if (type === 'PO Pending') {
-                    this.summaryModalItems = this.allPoData.filter(po => po.status_stage === 'Pending');
+                    this.summaryModalItems = this.summaryPoData.filter(po => po.status_stage === 'Pending');
                 } else if (type === 'PO Selesai') {
-                    this.summaryModalItems = this.allPoData.filter(po => po.status_stage === 'Selesai');
+                    this.summaryModalItems = this.summaryPoData.filter(po => po.status_stage === 'Selesai');
                 }
                 
                 this.isSummaryModalOpen = true;
@@ -614,11 +594,14 @@
         }
     }
     </script>   
-    <script src="{{ asset('js/fruit-calculator.js') }}?v=11"></script>
+    <script src="{{ asset('js/sbg-v24.js') }}?v={{ filemtime(public_path('js/sbg-v24.js')) }}"></script>
+    <script src="{{ asset('js/fruit-calculator.js') }}?v={{ filemtime(public_path('js/fruit-calculator.js')) }}"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <link rel="stylesheet" href="{{ asset('css/sbg-v2.css') }}?v={{ filemtime(public_path('css/sbg-v2.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sbg-v23.css') }}?v={{ filemtime(public_path('css/sbg-v23.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/sbg-v24.css') }}?v={{ filemtime(public_path('css/sbg-v24.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/sbg-v24-receipt.css') }}?v={{ filemtime(public_path('css/sbg-v24-receipt.css')) }}">
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
 <body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" data-account-id="{{ auth()->id() }}" x-data="dashboardApp" :class="'sbg-page-' + mobilePage + (sidebarCollapsed ? ' sbg-sidebar-collapsed' : '')" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'; if (location.hash === '#master-data') mobilePage = 'admin'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1024px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); mobilePage === 'admin' ? document.getElementById('master-search').focus() : focusPoSearch(); }">
@@ -1122,90 +1105,13 @@
         </div>
     </div>
 
-    <!-- MODAL SUMMARY PO (TOTAL / SELESAI / PENDING) -->
-    <div x-show="isSummaryModalOpen" 
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0"
-         x-transition:enter-end="opacity-100"
-         x-transition:leave="transition ease-in duration-150"
-         x-transition:leave-start="opacity-100"
-         x-transition:leave-end="opacity-0"
-         class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-         x-cloak>
-
-        <div @click.away="isSummaryModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-md rounded-xl overflow-hidden p-6 space-y-4 relative max-h-[85vh] flex flex-col border border-[#dce1d6]">
-            
-            <!-- Modal Header -->
-            <div class="flex items-center justify-between pb-2 border-b border-[#dce1d6] flex-shrink-0">
-                <h3 class="text-lg font-extrabold text-[#1c3328]" x-text="summaryModalTitle"></h3>
-                <button @click="isSummaryModalOpen = false" class="text-[#687168] hover:text-[#435348] text-2xl font-bold leading-none">&times;</button>
-            </div>
-
-            <!-- Modal Body (List Items / Empty State) -->
-            <div class="overflow-y-auto pr-1 space-y-3 flex-1">
-                <template x-if="summaryModalItems.length > 0">
-                    <div>
-                        <template x-for="item in summaryModalItems" :key="item.id">
-                            <div class="p-4 bg-[#f7f7f0]/60 rounded-lg border border-[#dce1d6]/80 space-y-3 mb-3">
-                                <div class="flex justify-between items-start">
-                                    <div>
-                                        <h4 class="font-bold text-[#1c3328] text-sm" x-text="item.item_name"></h4>
-                                        <p class="text-xs text-[#687168] mt-0.5" x-text="formatDate(item.transaction_date)"></p>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 text-xs pt-1 border-t border-[#dce1d6] gap-2">
-                                    <div>
-                                        <span class="text-[#687168] font-medium block">Kategori</span>
-                                        <span class="font-bold text-[#1c3328]" x-text="item.category || '-'"></span>
-                                    </div>
-                                    <div class="text-right">
-                                        <span class="text-[#687168] font-medium block">Qty</span>
-                                        <span class="font-bold text-[#1c3328]" x-text="(item.quantity || 0) + ' ' + (item.unit || '')"></span>
-                                    </div>
-                                </div>
-
-                                <div class="pt-2 border-t border-[#dce1d6]">
-                                    <span class="text-xs text-[#687168] font-medium block">Total Nilai</span>
-                                    <span class="text-sm font-black text-[#1c3328]" x-text="formatRupiah(item.total_supplier_amount ?? 0)"></span>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </template>
-
-                <!-- Empty State -->
-                <template x-if="summaryModalItems.length === 0">
-                    <div class="py-12 text-center text-[#687168] text-sm font-medium">
-                        <p x-text="'Tidak ada PO yang ' + (summaryModalTitle === 'PO Pending' ? 'pending' : summaryModalTitle === 'PO Selesai' ? 'selesai' : 'ditemukan')"></p>
-                    </div>
-                </template>
-            </div>
-
-        </div>
-    </div>
+    @include('components.sbg.po-summary')
+    @include('components.sbg.partner-receipt')
 
     @include('components.sbg.master-data-dialogs')
 
     @include('components.sbg.analytics-modal')
-    @if($loginPopup?->enabled && $showLoginPopup)
-        <div x-data="{ open: true }" x-show="open" x-cloak class="sbg-modal fixed inset-0 z-[80] flex items-center justify-center overflow-y-auto bg-[#0a291e]/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="login-popup-title" @keydown.escape.window="open = false">
-            <div class="sbg-modal-panel w-full max-w-lg overflow-hidden rounded-xl bg-white">
-                <div class="space-y-4 p-6 text-center">
-                    <img src="{{ asset('favicon.svg') }}" alt="Logo aplikasi" class="mx-auto h-20 w-20 object-contain">
-                    @if($loginPopup->title)
-                        <h2 id="login-popup-title" class="text-xl font-extrabold text-[#1c3328]">{{ $loginPopup->title }}</h2>
-                    @else
-                        <h2 id="login-popup-title" class="sr-only">Pengumuman</h2>
-                    @endif
-                    @if($loginPopup->message)
-                        <p class="whitespace-pre-line text-sm leading-relaxed text-[#435348]">{{ $loginPopup->message }}</p>
-                    @endif
-                    <button type="button" @click="open = false" class="w-full rounded-md bg-[#123d2c] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#0a291e]">Tutup</button>
-                </div>
-            </div>
-        </div>
-    @endif
+    @include('components.sbg.announcement')
 
     @if($popupFeedback)
         <div x-data="{ open: true }" x-show="open" x-cloak class="sbg-modal fixed inset-0 z-[90] flex items-center justify-center bg-[#0a291e]/60 p-4 backdrop-blur-sm" role="alertdialog" aria-modal="true" aria-labelledby="popup-feedback-title" @keydown.escape.window="open = false">

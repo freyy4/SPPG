@@ -5,7 +5,7 @@
     x-data="fruitCalculator({ base: @js(route('fruit-calculator.index', [], false)), csrf: @js(csrf_token()), region: @js($fruitDefaultRegion) })"
     x-init="$watch('activeView', value => { if (value === 'fruit' && !loaded) load(); }); if (activeView === 'fruit') load();"
     @resize.window.debounce.150ms="drawChart()"
-    class="fruit-tool mx-auto min-h-screen max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
+    class="fruit-tool sbg-v24-planning mx-auto min-h-screen max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <style>
         .fruit-tool { letter-spacing: 0; }
         .fruit-tool .fruit-category { margin-top: 12px; border: 1px solid #cdd7cf; border-radius: 8px; overflow: hidden; }
@@ -83,8 +83,16 @@
         .fruit-tool .fruit-price-dialog::backdrop { background: rgb(10 41 30 / .6); backdrop-filter: blur(3px); }
         .fruit-tool .fruit-price-dialog > .fruit-panel { border: 0; border-radius: 0; margin: 0; }
     </style>
-    <div class="fruit-hero flex flex-wrap items-end justify-between gap-4">
-        <div><p class="text-xs font-semibold text-[#687168]">Perencanaan menu MBG</p><h1 class="sbg-heading mt-1 text-2xl font-extrabold text-[#1c3328]">Kalkulator Buah Harian</h1><p class="fruit-subtitle">Atur anggaran dan porsi, bandingkan pilihan buah, lalu simpan keputusan menu harian.</p></div>
+    <div class="fruit-hero sbg-v24-hero">
+        <div><p class="sbg-v24-eyebrow">SENTRA BUAH GARUT · PERENCANAAN MENU</p><h1 class="sbg-heading" x-text="heroTitle"></h1><p class="fruit-subtitle" x-text="heroCopy"></p><span class="sbg-v24-hero-label">Buah segar, pilihan cermat.</span></div>
+        <picture aria-hidden="true"><source media="(max-width: 639px)" srcset="{{ asset('images/sbg-v24/farmer-480.webp') }}"><img src="{{ asset('images/sbg-v24/farmer-900.webp') }}" width="900" height="600" alt="" onerror="this.hidden=true"></picture>
+    </div>
+    <div class="sbg-v24-planning-toolbar">
+    <div class="fruit-navigation" role="tablist" aria-label="Kalkulator buah">
+        <button id="fruit-tab-calculate" class="fruit-tab" role="tab" aria-controls="fruit-calculate" :aria-selected="tab === 'calculate'" @click="tab = 'calculate'" :disabled="busy || loading">Kalkulator</button>
+        <button id="fruit-tab-master" class="fruit-tab" role="tab" aria-controls="fruit-master" :aria-selected="tab === 'master'" @click="tab = 'master'; $nextTick(() => drawChart())" :disabled="busy || loading">Katalog Buah</button>
+        <button id="fruit-tab-archive" class="fruit-tab" role="tab" aria-controls="fruit-archive" :aria-selected="tab === 'archive'" @click="tab = 'archive'; loadArchive(1)" :disabled="busy || loading">Arsip Keputusan</button>
+    </div>
         <div class="fruit-hero-controls flex items-end gap-2">
             @if(auth()->user()->isSuperAdmin())
                 <label>Wilayah<select x-model="region" @change="changeRegion()" :disabled="busy || loading">
@@ -98,11 +106,6 @@
             @endif
             <button type="button" class="fruit-btn" @click="refresh()" :disabled="busy || loading" title="Muat ulang data" aria-label="Muat ulang data"><span aria-hidden="true">&#8635;</span></button>
         </div>
-    </div>
-    <div class="fruit-navigation" role="tablist" aria-label="Kalkulator buah">
-        <button id="fruit-tab-calculate" class="fruit-tab" role="tab" aria-controls="fruit-calculate" :aria-selected="tab === 'calculate'" @click="tab = 'calculate'" :disabled="busy || loading">Kalkulator</button>
-        <button id="fruit-tab-master" class="fruit-tab" role="tab" aria-controls="fruit-master" :aria-selected="tab === 'master'" @click="tab = 'master'; $nextTick(() => drawChart())" :disabled="busy || loading">Katalog Buah</button>
-        <button id="fruit-tab-archive" class="fruit-tab" role="tab" aria-controls="fruit-archive" :aria-selected="tab === 'archive'" @click="tab = 'archive'; loadArchive(1)" :disabled="busy || loading">Arsip Keputusan</button>
     </div>
     <div x-show="error" role="alert" class="rounded-md border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800" x-text="error"></div>
     <div x-show="message" role="status" class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800" x-text="message"></div>
@@ -130,14 +133,16 @@
                     <button type="button" class="fruit-btn" @click="copiedFruits = []" :disabled="busy">Batal salin</button>
                 </div>
             </div>
-            <p class="text-xs text-[#687168]">Klik kategori untuk menampilkan atau menyembunyikan buah.</p>
+            <label class="sbg-v24-search"><span>Cari kandidat buah</span><input type="search" x-model="candidateSearch" placeholder="Cari nama buah…" maxlength="100"></label>
+            <p x-show="candidateSearch && !fruitGroups.some(group => group.fruits.length)" class="fruit-empty">Tidak ada kandidat yang cocok.</p>
             <template x-for="group in fruitGroups" :key="group.name">
-                <details class="fruit-category">
+                <details class="fruit-category" open>
                     <summary><span x-text="group.name"></span> <span class="fruit-count" x-text="group.fruits.length + ' buah'"></span></summary>
             <div class="fruit-category-content grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <template x-for="fruit in group.fruits" :key="fruit.id">
                     <div class="fruit-card" :class="{ 'is-selected': selectedIds.includes(fruit.id) }">
                         <label class="flex cursor-pointer items-start gap-3">
+                            <span class="sbg-v24-fruit-thumb" aria-hidden="true"><svg viewBox="0 0 80 80"><use :href="'/images/sbg-fruits.svg#' + fruitSymbol(fruit.name)"></use></svg></span>
                             <input class="mt-1" type="checkbox" :value="fruit.id" x-model.number="selectedIds" :disabled="busy || loading || (!selectedIds.includes(fruit.id) && selectedIds.length >= 100)">
                             <span class="min-w-0 flex-1">
                                 <strong class="block break-words text-sm text-[#1c3328]" x-text="fruit.name"></strong>
@@ -193,20 +198,24 @@
                 </div>
             </template>
         </div>
+        <div class="sbg-v24-recommendation" x-show="results.length" role="status"><div><span>KANDIDAT TERMURAH DALAM ANGGARAN</span><strong x-text="recommendation ? recommendation.name + ' · ' + money(recommendation.cost) : 'Belum ada kandidat dalam anggaran'"></strong><small>Biaya untuk satu pilihan buah.</small></div><button type="button" class="fruit-btn" x-show="recommendation" @click="choose(recommendation)" :disabled="busy || loading">Pilih & simpan keputusan →</button></div>
     </div>
 
     <div id="fruit-master" role="tabpanel" aria-labelledby="fruit-tab-master" x-show="tab === 'master'" class="space-y-6">
-        <div class="fruit-section-heading"><div><h2>Katalog buah</h2><p>Isi buah, harga per kg, dan porsi untuk digunakan di kalkulator.</p></div><button class="fruit-btn fruit-primary" @click="addFruit()" :disabled="busy || loading || region === 'Semua Wilayah'">Tambah buah</button></div>
+        <div class="fruit-section-heading"><div><h2>Daftar Buah</h2><p>Harga dan standar porsi terbaru dari katalog wilayah.</p></div><button class="fruit-btn fruit-primary" @click="addFruit()" :disabled="busy || loading || region === 'Semua Wilayah'">+ Tambah buah</button></div>
+        <div class="sbg-v24-catalog-controls"><label class="sbg-v24-search"><span>Cari buah</span><input type="search" x-model="catalogSearch" @input="catalogPage = 1" placeholder="Nama buah, wilayah, atau satuan…" maxlength="100"></label><label>Urutkan<select x-model="catalogSort" @change="catalogPage = 1"><option value="name">Nama A–Z</option><option value="price">Harga terendah</option><option value="price-desc">Harga tertinggi</option></select></label></div>
         <p x-show="region === 'Semua Wilayah'" class="text-sm text-[#687168]">Pilih satu wilayah untuk menambahkan buah.</p>
         <p x-show="loaded && !fruits.length" class="fruit-empty text-sm text-[#687168]">Katalog buah masih kosong. Tambahkan buah pertama Anda.</p>
-        <div x-show="fruits.length" class="fruit-panel overflow-x-auto"><table>
+        <div x-show="fruits.length" class="fruit-panel sbg-v24-records"><table>
             <thead><tr><th>Buah</th><th>Wilayah</th><th>Satuan porsi</th><th>Isi/kg</th><th>Porsi PB / PK</th><th>Harga/kg</th><th>Aksi</th></tr></thead>
-            <tbody><template x-for="fruit in fruits" :key="fruit.id"><tr>
-                <td class="font-bold" x-text="fruit.name"></td><td x-text="fruit.source_region"></td><td x-text="fruit.unit"></td>
-                <td x-text="number(fruit.units_per_kg, 4)"></td><td x-text="number(fruit.portion_pb, 4) + ' / ' + number(fruit.portion_pk, 4)"></td>
-                <td class="whitespace-nowrap" x-text="money(fruit.price)"></td><td><div class="flex gap-2"><button class="fruit-btn" @click="edit(fruit)" :disabled="busy || loading">Edit</button><button class="fruit-btn" @click="openPriceDetail(fruit)" :disabled="busy || loading">Riwayat harga</button></div></td>
+            <tbody><template x-for="fruit in catalogRows" :key="fruit.id"><tr>
+                <td data-label="Buah"><div class="sbg-v24-fruit-name"><span class="sbg-v24-fruit-thumb" aria-hidden="true"><svg viewBox="0 0 80 80"><use :href="'/images/sbg-fruits.svg#' + fruitSymbol(fruit.name)"></use></svg></span><strong x-text="fruit.name"></strong></div></td><td data-label="Wilayah" x-text="fruit.source_region"></td><td data-label="Satuan" x-text="fruit.unit"></td>
+                <td data-label="Isi/kg" x-text="number(fruit.units_per_kg, 4)"></td><td data-label="PB / PK" x-text="number(fruit.portion_pb, 4) + ' / ' + number(fruit.portion_pk, 4)"></td>
+                <td data-label="Harga/kg" class="whitespace-nowrap" x-text="money(fruit.price)"></td><td data-label="Aksi"><div class="flex gap-2"><button class="fruit-btn" @click="edit(fruit)" :disabled="busy || loading">Edit</button><button class="fruit-btn" @click="openPriceDetail(fruit)" :disabled="busy || loading">Riwayat harga</button></div></td>
             </tr></template></tbody>
         </table></div>
+        <p x-show="fruits.length && !catalogMatches.length" class="fruit-empty">Tidak ada buah yang cocok dengan pencarian.</p>
+        <div class="sbg-v24-pagination" x-show="catalogMatches.length"><span x-text="catalogMatches.length + ' buah · Halaman ' + Math.min(catalogPage, catalogPages) + ' dari ' + catalogPages"></span><div><button class="fruit-btn" @click="catalogPage = Math.max(1, catalogPage - 1)" :disabled="catalogPage <= 1">← Sebelumnya</button><button class="fruit-btn" @click="catalogPage++" :disabled="catalogPage >= catalogPages">Berikutnya →</button></div></div>
         <dialog id="fruit-price-detail" x-ref="priceDetail" class="fruit-price-dialog" aria-labelledby="fruit-price-title" @cancel.prevent="closePriceDetail()" @click="if ($event.target === $el) closePriceDetail()">
             <div class="fruit-panel space-y-4">
             <div class="flex flex-wrap items-end justify-between gap-4"><div><h2 id="fruit-price-title" class="text-base font-bold" x-text="'Riwayat harga ' + (historyFruit?.name || '')"></h2><p class="mt-1 text-xs text-[#687168]" x-text="(historyFruit?.source_region || '') + ' · Harga per ' + 'kg'"></p></div><div class="flex items-end gap-3"><label>Periode<select x-model="days" @change="loadHistory()"><option value="7">7 hari</option><option value="30">30 hari</option><option value="90">90 hari</option></select></label><button class="fruit-btn" @click="closePriceDetail()" aria-label="Tutup riwayat harga">Tutup</button></div></div>
@@ -220,9 +229,10 @@
     </div>
 
     <div id="fruit-archive" role="tabpanel" aria-labelledby="fruit-tab-archive" x-show="tab === 'archive'" class="fruit-panel space-y-6">
-        <h2 class="text-base font-bold text-[#1c3328]">Arsip Keputusan Harian</h2>
-        <p x-show="!archive.length && !loading" class="text-sm text-[#687168]">Belum ada keputusan tersimpan.</p>
-        <div x-show="archive.length" class="overflow-x-auto"><table><thead><tr><th>No.</th><th>Tanggal menu</th><th>Buah dipilih</th><th>Total biaya</th><th>Penyusun</th><th></th></tr></thead><tbody><template x-for="entry in archive" :key="entry.id"><tr><td x-text="'#' + entry.id"></td><td class="whitespace-nowrap" x-text="entry.decision_date"></td><td class="font-bold" x-text="entry.snapshot.selected.name"></td><td class="whitespace-nowrap" x-text="money(entry.snapshot.selected.cost)"></td><td x-text="entry.snapshot.author"></td><td><button class="fruit-btn" @click="openReport(entry.id)" :disabled="busy || loading">Lihat laporan</button></td></tr></template></tbody></table></div>
+        <div class="fruit-section-heading"><div><h2>Riwayat Keputusan Harian</h2><p>Keputusan yang tersimpan beserta laporan dan rincian perhitungan.</p></div></div>
+        <form @submit.prevent="loadArchive(1)" class="sbg-v24-archive-search"><label class="sbg-v24-search"><span>Cari arsip</span><input type="search" x-model="archiveSearch" maxlength="100" placeholder="Tanggal, buah, atau penyusun…"></label><button class="fruit-btn fruit-primary" :disabled="loading || busy">Cari arsip</button></form>
+        <p x-show="!archive.length && !loading" class="text-sm text-[#687168]">Belum ada keputusan yang cocok. Coba ubah pencarian atau simpan pilihan dari kalkulator.</p>
+        <div x-show="archive.length" class="sbg-v24-records"><table><thead><tr><th>Tanggal menu / Arsip</th><th>Buah dipilih</th><th>Total biaya</th><th>Penyusun</th><th>Laporan</th></tr></thead><tbody><template x-for="entry in archive" :key="entry.id"><tr><td data-label="Tanggal / Arsip"><strong x-text="entry.decision_date"></strong><small class="block" x-text="'#' + entry.id"></small></td><td data-label="Buah"><div class="sbg-v24-fruit-name"><span class="sbg-v24-fruit-thumb" aria-hidden="true"><svg viewBox="0 0 80 80"><use :href="'/images/sbg-fruits.svg#' + fruitSymbol(entry.snapshot.selected.name)"></use></svg></span><strong x-text="entry.snapshot.selected.name"></strong></div></td><td data-label="Total biaya" class="whitespace-nowrap font-bold" x-text="money(entry.snapshot.selected.cost)"></td><td data-label="Penyusun" x-text="entry.snapshot.author"></td><td data-label="Laporan"><button class="fruit-btn" @click="openReport(entry.id)" :disabled="busy || loading">Lihat laporan →</button></td></tr></template></tbody></table></div>
         <div x-show="lastPage > 1" class="flex items-center justify-end gap-3 text-xs"><button class="fruit-btn" @click="loadArchive(page - 1)" :disabled="page <= 1 || loading || busy" aria-label="Halaman sebelumnya">&larr;</button><span x-text="page + ' / ' + lastPage"></span><button class="fruit-btn" @click="loadArchive(page + 1)" :disabled="page >= lastPage || loading || busy" aria-label="Halaman berikutnya">&rarr;</button></div>
         <template x-if="report"><div class="space-y-4 border-t border-[#dce1d6] pt-6">
             <div class="flex flex-wrap items-center justify-between gap-3"><h3 class="text-lg font-bold" x-text="'Laporan #' + report.id"></h3><div class="flex gap-2"><button class="fruit-btn" @click="exportReport('pdf')" :disabled="exporting"><span aria-hidden="true">&#8595;</span> PDF</button><button class="fruit-btn" @click="exportReport('xlsx')" :disabled="exporting"><span aria-hidden="true">&#8595;</span> Excel</button></div></div>

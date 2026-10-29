@@ -1,5 +1,5 @@
 document.addEventListener('alpine:init', () => {
-    Alpine.data('fruitCalculator', (config) => ({
+    Alpine.data('fruitCalculator', (config) => Object.defineProperties({
         region: config.region, tab: 'calculate', loaded: false, loading: false, busy: false,
         error: '', message: '', fruits: [], selectedIds: [], budget: '', budgetInput: '', priceInput: '', pb: '', pk: '',
         date: new Date().toLocaleDateString('en-CA'), editor: null, copiedFruits: [],
@@ -22,7 +22,7 @@ document.addEventListener('alpine:init', () => {
             return firstWord ? firstWord.charAt(0).toLocaleUpperCase('id-ID') + firstWord.slice(1) : 'Lainnya';
         },
         get categories() { return [...new Set(this.fruits.map(fruit => this.fruitCategory(fruit)))].sort((a, b) => a.localeCompare(b, 'id')); },
-        get fruitGroups() { return this.categories.map(name => ({ name, fruits: this.fruits.filter(fruit => this.fruitCategory(fruit) === name) })); },
+        get fruitGroups() { return this.categories.map(name => ({ name, fruits: this.fruits.filter(fruit => this.fruitCategory(fruit) === name && fruit.name.toLocaleLowerCase('id').includes(this.candidateSearch.toLocaleLowerCase('id'))) })).filter(group => group.fruits.length); },
         ready(fruit) { return ['units_per_kg', 'portion_pb', 'portion_pk', 'price'].every(key => Number(fruit[key]) > 0); },
         get incompleteSelection() { return this.fruits.some(f => this.selectedIds.includes(f.id) && !this.ready(f)); },
         number(value, digits = 2) { return Number(value).toLocaleString('id-ID', { maximumFractionDigits: digits }); },
@@ -58,7 +58,7 @@ document.addEventListener('alpine:init', () => {
         },
         async changeRegion() {
             if (this.priceDetailOpen) this.closePriceDetail();
-            this.selectedIds = []; this.editor = null; this.report = null;
+            this.selectedIds = []; this.editor = null; this.report = null; this.catalogPage = 1;
             this.historyId = ''; this.history = []; this.historyRequest++; this.archive = []; this.pendingDecision = null;
             this.message = ''; await this.load();
             if (this.tab === 'archive') await this.loadArchive(1);
@@ -157,12 +157,14 @@ document.addEventListener('alpine:init', () => {
             finally { this.busy = false; }
         },
         async loadArchive(page = 1) {
+            const request = ++this.archiveRequest;
             this.loading = true; this.error = '';
             try {
-                const result = await this.api('/decisions?page=' + page);
+                const result = await this.api('/decisions?page=' + page + '&search=' + encodeURIComponent(this.archiveSearch.trim()));
+                if (request !== this.archiveRequest) return;
                 this.archive = result.data; this.page = result.current_page; this.lastPage = result.last_page;
-            } catch (error) { this.error = error.message; }
-            finally { this.loading = false; }
+            } catch (error) { if (request === this.archiveRequest) this.error = error.message; }
+            finally { if (request === this.archiveRequest) this.loading = false; }
         },
         async openReport(id) {
             this.busy = true; this.error = '';
@@ -276,5 +278,5 @@ document.addEventListener('alpine:init', () => {
             } catch (error) { this.error = error.message; }
             finally { this.exporting = false; }
         },
-    }));
+    }, Object.getOwnPropertyDescriptors(window.sbgPlanningUI())));
 });

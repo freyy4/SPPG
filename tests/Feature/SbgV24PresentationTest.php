@@ -33,8 +33,30 @@ class SbgV24PresentationTest extends TestCase
             file_put_contents($directory.'/calculator.json',$this->getJson($base)->getContent());
             file_put_contents($directory.'/archive.json',$this->getJson($base.'/decisions')->getContent());
         }
+        $response->assertViewHas('summaryPoData', fn ($rows) => $rows->count() === 32 && $rows->sum('ui_po_value') === 102480000.0);
+        $response->assertViewHas('summary', fn ($summary) => $summary['total_nilai_po'] === 102480000.0 && $summary['po_selesai'] === 16);
+        $response->assertViewHas('purchaseOrders', fn ($page) => $page->count() === 15);
+        $this->getJson($base.'/decisions?search=Semangka')->assertOk()->assertJsonPath('total', 3);
+        $this->getJson($base.'/decisions?search=not-present')->assertOk()->assertJsonPath('total', 0);
+        $this->getJson($base.'/decisions?search='.str_repeat('x', 101))->assertUnprocessable();
+        // Search remains inside the existing authorization boundary.
+        $this->actingAs(User::factory()->create(['role'=>'admin', 'region'=>'Other']));
+        $this->getJson($base.'/decisions?search=Semangka')->assertOk()->assertJsonPath('total', 0);
+        $this->getJson($base.'/decisions?region=Pusat&search=Semangka')->assertForbidden();
+        $this->actingAs($user);
         $this->assertDatabaseCount('purchase_orders',32);
         $this->assertDatabaseCount('fruit_catalog',16);
         $this->assertDatabaseCount('fruit_decisions',16);
     }
+    public function test_logout_still_invalidates_authentication_and_regenerates_the_csrf_token(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user)->get('/dashboard')->assertOk();
+        $token = session()->token();
+        $this->post('/logout')->assertRedirect('/login');
+        $this->assertGuest();
+        $this->assertNotSame($token, session()->token());
+        $this->get('/dashboard')->assertRedirect('/login');
+    }
+
 }
