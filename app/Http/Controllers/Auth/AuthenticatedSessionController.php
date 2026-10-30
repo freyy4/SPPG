@@ -25,6 +25,9 @@ class AuthenticatedSessionController extends Controller
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
+        if ($request->session()->has('security.pending_login')) {
+            return redirect()->route('two-factor.challenge');
+        }
 
         $request->session()->regenerate();
         $request->session()->put('show_login_popup', true);

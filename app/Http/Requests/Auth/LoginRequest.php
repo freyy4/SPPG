@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Services\AccountSecurity;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -42,15 +43,27 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
+        $security = app(AccountSecurity::class);
+        // SessionGuard validates inside its timing-safe envelope without logging in.
+        $valid = Auth::validate($this->only('email', 'password'));
+        $user = Auth::getLastAttempted();
+        if (! $valid) {
             RateLimiter::hit($this->throttleKey());
-
-            throw ValidationException::withMessages([
-                'email' => 'E-mail atau password salah, silahkan hubungi SuperAdmin',
-            ]);
+            RateLimiter::hit('login:account:'.hash('sha256', Str::lower((string) $this->input('email'))), 300);
+            $security->audit($this, 'login.failed', $user);
+            throw ValidationException::withMessages(['email' => 'E-mail atau password salah, silahkan hubungi SuperAdmin']);
         }
-
         RateLimiter::clear($this->throttleKey());
+        RateLimiter::clear('login:account:'.hash('sha256', Str::lower((string) $this->input('email'))));
+        $this->session()->forget('security.pending_login');
+        $this->session()->regenerate(true);
+        if ($user->totp_enabled_at) {
+            $this->session()->put('security.pending_login', ['id' => $user->id, 'remember' => $this->boolean('remember'), 'expires' => now()->addMinutes(5)->timestamp, 'password_fingerprint' => hash('sha256', $user->password)]);
+
+            return;
+        }
+        Auth::login($user, $this->boolean('remember'));
+        $security->audit($this, 'login.succeeded', $user);
     }
 
     /**
@@ -60,13 +73,20 @@ class LoginRequest extends FormRequest
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
+        $accountKey = 'login:account:'.hash('sha256', Str::lower((string) $this->input('email')));
+        $ipBlocked = RateLimiter::tooManyAttempts($this->throttleKey(), 5);
+        $accountBlocked = RateLimiter::tooManyAttempts($accountKey, 5);
+
+        if (! $ipBlocked && ! $accountBlocked) {
             return;
         }
 
         event(new Lockout($this));
 
-        $seconds = RateLimiter::availableIn($this->throttleKey());
+        $seconds = max(
+            $ipBlocked ? RateLimiter::availableIn($this->throttleKey()) : 0,
+            $accountBlocked ? RateLimiter::availableIn($accountKey) : 0,
+        );
 
         throw ValidationException::withMessages([
             'email' => trans('auth.throttle', [

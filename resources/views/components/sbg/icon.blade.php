@@ -33,6 +33,7 @@
         @case('pie')<path d="M12 3v9h9A9 9 0 1 1 12 3ZM15 2v7h7a8 8 0 0 0-7-7Z"/>@break
         @case('whatsapp')<path d="m3 21 1-5a9 9 0 1 1 4 4Zm5-14c-2 3 3 8 6 9l3-2-3-2-1 1-3-3 1-1-2-3Z"/>@break
         @case('leaf')<path d="M4 20C0 8 12 1 21 3c1 11-6 18-17 17Zm0 0L16 8"/>@break
+        @case('settings')<path d="m9 3 1-1h4l1 3 3 1 3-1 2 4-2 2v3l2 2-2 4-3-1-3 1-1 3h-4l-1-3-3-1-3 1-2-4 2-2v-3L1 9l2-4 3 1 3-1Z"/><circle cx="12" cy="12" r="3"/>@break
         @default<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>
     @endswitch
 </svg>

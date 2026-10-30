@@ -1,0 +1,8 @@
+# Reviewed P2 fixes — round 1
+
+- Add PO accepted close now reloads the initial seed (including warehouse quantities and all price inputs), clears validation/message state, and establishes a clean baseline before hiding. Rejected confirmation and busy submission preserve the draft. X, Cancel, Escape, and backdrop retain their shared `requestClose()` path. Edit loading, version handling, and financial calculations are unchanged.
+- Account settings only consumes encrypted pending recovery delivery for security-tab HTML or JSON that returns the codes. Profile/account/default/invalid-tab HTML neither exposes nor consumes it. User binding, expiry, and once-only delivery remain enforced.
+- Both defects were reproduced by failing executable tests before their respective application edit, then passed with the minimal fix. Dedicated tests: `tests/UI/sbg-v25-po-discard.test.cjs` (production JS factory in Node VM) and `tests/Feature/RecoveryCodeDeliveryTest.php` (in-process HTTP, including actual enrollment redirect).
+- Verification: focused AccountSecurity/PO/Experience plus recovery tests: 35 passed, 606 assertions. UI Node suite: 14 passed. PHP syntax checks passed. PHPUnit used a fresh random APP_KEY, SQLite `:memory:`, empty DB_URL, array cache/mail/session, sync queue, an explicit no-dotenv bootstrap, and external scratch runtime paths. No production access/deploy/restart or browser work. Full-suite rerun and independent review remain with the parent; this does not clear the separate provider security-review blocker.
+
+Detailed commands, hashes, RED/GREEN results and logs are recorded outside the repository in `/root/.hermes/cache/scratch/sbg-v25/fix-round1-result.json`.

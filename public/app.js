@@ -5,68 +5,10 @@
   // Biarkan kosong untuk memilih sendiri kontak tujuan di WhatsApp.
   const WHATSAPP_NUMBER = '';
 
-  const THEME_STORAGE_KEY = 'sbg-theme';
-  const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
-  let themePreference = null;
-
-  const validTheme = (value) => value === 'dark' || value === 'light';
-
-  try {
-    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (validTheme(savedTheme)) themePreference = savedTheme;
-  } catch {
-    // Tema tetap bisa diubah saat penyimpanan browser tidak tersedia.
-  }
-
-  const applyTheme = () => {
-    const theme = themePreference || (systemTheme.matches ? 'dark' : 'light');
-    document.documentElement.dataset.theme = theme;
-
-    const themeColor = document.querySelector('meta[name="theme-color"]');
-    if (themeColor) themeColor.content = theme === 'dark' ? '#111b16' : '#f7f7f0';
-
-    const toggle = document.querySelector('.theme-toggle');
-    if (toggle) {
-      toggle.setAttribute('aria-pressed', String(theme === 'dark'));
-      toggle.title = theme === 'dark' ? 'Aktifkan mode terang' : 'Aktifkan mode gelap';
-      toggle.hidden = false;
-    }
-  };
-
-  // Berjalan di <head> sebelum stylesheet untuk menghindari kilatan tema berbeda.
-  applyTheme();
-
-  const followSystemTheme = () => {
-    if (!themePreference) applyTheme();
-  };
-  if (typeof systemTheme.addEventListener === 'function') {
-    systemTheme.addEventListener('change', followSystemTheme);
-  } else {
-    systemTheme.addListener(followSystemTheme);
-  }
-
-  window.addEventListener('storage', (event) => {
-    if (event.key !== THEME_STORAGE_KEY && event.key !== null) return;
-    themePreference = validTheme(event.newValue) ? event.newValue : null;
-    applyTheme();
-  });
+  // Theme selection is owned by sbg-v25-theme.js on every surface.
 
   const initializeWelcome = () => {
     document.documentElement.classList.add('js-enabled');
-
-    const themeToggle = document.querySelector('.theme-toggle');
-    if (themeToggle) {
-      themeToggle.addEventListener('click', () => {
-        themePreference = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-        try {
-          window.localStorage.setItem(THEME_STORAGE_KEY, themePreference);
-        } catch {
-          // Pilihan tetap berlaku pada halaman ini jika penyimpanan diblokir.
-        }
-        applyTheme();
-      });
-    }
-    applyTheme();
 
     const menuToggle = document.querySelector('.menu-toggle');
     const mainNav = document.querySelector('#main-nav');

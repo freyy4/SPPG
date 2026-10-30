@@ -399,8 +399,27 @@ class DashboardController extends Controller
             unset($validated['supplier_name']);
         }
 
-        $purchaseOrder->update($validated);
+        // Optional version token: legacy callers without it retain their existing contract.
+        $request->validate(['updated_at' => 'nullable|date']);
+        DB::transaction(function () use ($request, $purchaseOrder, $validated) {
+            $current = PurchaseOrder::whereKey($purchaseOrder->getKey())->lockForUpdate()->firstOrFail();
+            if ($request->filled('updated_at')) {
+                $expected = \Illuminate\Support\Carbon::parse($request->input('updated_at'));
+                abort_unless($current->updated_at->equalTo($expected), 409,
+                    'PO telah diperbarui oleh pengguna lain. Salin perubahan Anda, lalu tutup dan buka kembali PO.');
+            }
+            // Existing schema stores whole seconds. Advance monotonically for legacy
+            // writes too, so a same-second write cannot resurrect an accepted version.
+            $timestamp = now()->startOfSecond();
+            $current->updated_at = $timestamp->greaterThan($current->updated_at)
+                ? $timestamp : $current->updated_at->copy()->addSecond();
+            $current->fill($validated)->save();
+        });
 
+        if ($request->expectsJson()) {
+            session()->flash('success', 'Purchase Order berhasil diperbarui.');
+            return response()->json(['success' => true]);
+        }
         return redirect()->back()->with('success', 'Purchase Order berhasil diperbarui.');
     }
 

@@ -11,6 +11,7 @@
         <a href="#kalkulator-buah" @click="openFruitTab('master')"><x-sbg.icon name="leaf"/>Katalog Buah</a>
         <a href="#kalkulator-buah" @click="openFruitTab('archive')"><x-sbg.icon name="po"/>Arsip Keputusan</a>
         @if(auth()->user()->isSuperAdmin() || auth()->user()->isKepalaDapur())<a href="#master-data" :class="activeView === 'dashboard' && mobilePage === 'admin' ? 'is-active' : ''" :aria-current="activeView === 'dashboard' && mobilePage === 'admin' ? 'page' : null" @click="activeView = 'dashboard'; mobilePage = 'admin'; navOpen = false"><x-sbg.icon name="users"/>Master Data</a>@endif
+        <a href="{{ url('/settings/account') }}"><x-sbg.icon name="settings"/>Pengaturan Akun</a>
         <button type="button" @click="navOpen = false; $dispatch('open-analisa-modal')"><x-sbg.icon name="chart"/>Analisa</button>
     </nav>
     <div class="sbg-sidebar-bottom"><x-sbg.account-menu :sidebar="true"/></div>

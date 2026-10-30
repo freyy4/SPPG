@@ -21,7 +21,7 @@ class User extends Authenticatable
 
     protected $hidden = [
         'password',
-        'remember_token',
+        'remember_token', 'pin_hash', 'totp_secret', 'totp_pending_secret', 'totp_pending_expires_at', 'totp_enabled_at', 'totp_last_step', 'recovery_code_hashes',
     ];
 
     protected function casts(): array
@@ -29,6 +29,12 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'totp_secret' => 'encrypted',
+            'totp_pending_secret' => 'encrypted',
+            'totp_pending_expires_at' => 'datetime',
+            'totp_enabled_at' => 'datetime',
+            'totp_last_step' => 'integer',
+            'recovery_code_hashes' => 'array',
         ];
     }
 

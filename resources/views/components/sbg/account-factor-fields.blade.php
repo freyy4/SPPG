@@ -1,0 +1,3 @@
+@props(['prefix'])
+<div class="sbg-field"><label for="{{ $prefix }}-code">Kode Authenticator</label><input id="{{ $prefix }}-code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" aria-describedby="{{ $prefix }}-factor-help"><small id="{{ $prefix }}-factor-help">Isi kode 6 digit dari aplikasi, atau gunakan satu kode pemulihan di bawah.</small></div>
+<details><summary>Gunakan kode pemulihan sebagai gantinya</summary><div class="sbg-field"><label for="{{ $prefix }}-recovery">Kode pemulihan sekali pakai</label><input id="{{ $prefix }}-recovery" name="recovery_code" autocomplete="off" autocapitalize="off" spellcheck="false"></div></details>

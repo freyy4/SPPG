@@ -1,19 +1,12 @@
 <?php
 
-use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\AccountSecurityController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\LoginPopupController;
-use App\Http\Controllers\DataDaerahController;
 use App\Http\Controllers\FruitCalculatorController;
-use App\Http\Controllers\PurchaseOrderController;
+use App\Http\Controllers\LoginPopupController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome')->name('home');
-
-Route::middleware('guest')->group(function () {
-    Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'authenticate']);
-});
 
 Route::get('/verify/po/{purchaseOrder}', [DashboardController::class, 'verifyPurchaseOrder'])
     ->middleware('signed:relative')
@@ -25,7 +18,7 @@ Route::get('/verify/payment/{type}', [DashboardController::class, 'verifyPayment
     ->middleware('signed:relative')
     ->name('payment.verify');
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'auth.session'])->group(function () {
     Route::prefix('dashboard/fruit-calculator')->name('fruit-calculator.')->group(function () {
         Route::get('/', [FruitCalculatorController::class, 'index'])->name('index');
         Route::post('/fruits/bulk', [FruitCalculatorController::class, 'storeMany']);
@@ -40,12 +33,12 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/dashboard/users/{user}/login-popup', [LoginPopupController::class, 'update'])->name('dashboard.login-popup.update');
     Route::post('/dashboard/users/{user}/login-popup/toggle', [LoginPopupController::class, 'toggle'])->name('dashboard.login-popup.toggle');
     Route::post('/dashboard', [DashboardController::class, 'index']);
-    Route::put('/admin/region/{id}', [DashboardController::class, 'updateRegion']);    
+    Route::put('/admin/region/{id}', [DashboardController::class, 'updateRegion']);
     Route::put('/admin/account/{account}', [DashboardController::class, 'updateManagedAccount'])
         ->name('admin.account.update');
     Route::delete('/admin/account/{account}', [DashboardController::class, 'destroyManagedAccount'])
         ->name('admin.account.destroy');
-    Route::put('/account/password', [DashboardController::class, 'updateOwnPassword'])
+    Route::put('/account/password', [AccountSecurityController::class, 'password'])->middleware('auth.session')
         ->name('account.password.update');
     Route::delete('/region/{id}', [DashboardController::class, 'destroyRegion'])->name('admin.region.destroy');
     Route::get('/dashboard/analisa-po', [DashboardController::class, 'getPoAnalysis'])->name('dashboard.po-analysis');
@@ -77,3 +70,4 @@ Route::middleware(['auth'])->group(function () {
 });
 
 require __DIR__.'/auth.php';
+require __DIR__.'/account.php';

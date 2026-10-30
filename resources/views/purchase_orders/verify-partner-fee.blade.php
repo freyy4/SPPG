@@ -6,6 +6,7 @@
     <title>SISTEM PO</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <script src="https://cdn.tailwindcss.com"></script>
+    @include('components.sbg.theme-head')
 </head>
 <body class="min-h-screen bg-gray-50 p-4 font-sans text-gray-900 sm:p-8">
     <main class="mx-auto w-full max-w-2xl overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-xl">

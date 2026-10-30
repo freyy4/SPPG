@@ -350,7 +350,8 @@
             activeView: location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard',
             isDetailModalOpen: false,
             isCreateModalOpen: @json(old('_sbg_create') === '1' && session('errors')?->any()),
-            isEditModalOpen: false,
+            isEditModalOpen: @json((bool) old('_sbg_edit') && session('errors')?->any()),
+            poEditLoading: false, poEditError: '', poEditRequest: 0, poEditReturnFocus: null,
             isAddAdminModalOpen: false,
             createNewRegion: false,
             isResetOwnPasswordModalOpen: false,
@@ -376,13 +377,6 @@
             // State Selected PO & Edit PO
             selectedPo: {},
             editPo: {},
-            createQuantities: { sbg: @json(old('_sbg_create') === '1' ? old('quantity_sbg', 0) : 0), b: @json(old('_sbg_create') === '1' ? old('quantity_b', 0) : 0) },
-            createPrices: {
-                supplier_price: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('supplier_price', '') : '')),
-                supplier_price_b: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('supplier_price_b', '0') : '0')),
-                maker_price: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('maker_price', '') : '')),
-                partner_margin: formatCurrencyValue(@json(old('_sbg_create') === '1' ? old('partner_margin', '') : ''))
-            },
 
             allPoData: @json($purchaseOrders->items()),
             summaryPoData: @json($summaryPoData),
@@ -455,17 +449,29 @@
                 this.$nextTick(() => { const field = document.getElementById('po-filter-search'); field.scrollIntoView({ block: 'center' }); field.focus(); });
             },
 
-            openEditModal(po) {
+            async openEditModal(po) {
+                // The invoking menu item/detail button becomes hidden. Return to
+                // the same PO's visible menu trigger instead of that hidden child.
+                this.poEditReturnFocus = [...document.querySelectorAll('.sbg-po-overflow > button')]
+                    .find(button => button.getAttribute('aria-label') === 'Aksi PO ' + po.po_number && button.getClientRects().length)
+                    || document.activeElement;
                 this.isDetailModalOpen = false;
-                this.editPo = JSON.parse(JSON.stringify(po));
-                this.editPo.quantity_sbg = po.quantity_sbg ?? po.quantity;
-                this.editPo.quantity_b = po.quantity_b ?? 0;
-                this.editPo.transaction_date = this.toDateInputValue(po.transaction_date);
-                this.editPo.supplier_price = formatCurrencyValue(po.supplier_price);
-                this.editPo.supplier_price_b = formatCurrencyValue(po.supplier_price_b ?? po.supplier_price);
-                this.editPo.maker_price = formatCurrencyValue(po.maker_price);
-                this.editPo.partner_margin = formatCurrencyValue(po.partner_margin);
+                const request = ++this.poEditRequest;
+                this.poEditLoading = true;
+                this.poEditError = '';
+                this.editPo = {};
                 this.isEditModalOpen = true;
+                try {
+                    const response = await fetch(`/dashboard/po/${po.id}`, { headers: { Accept: 'application/json' } });
+                    if (!response.ok) throw new Error('Data PO gagal dimuat. Tutup dan coba lagi.');
+                    const result = await response.json();
+                    if (!result.success || Number(result.data?.id) !== Number(po.id)) throw new Error('Data PO tidak tersedia.');
+                    if (request === this.poEditRequest && this.isEditModalOpen) this.editPo = result.data;
+                } catch (error) {
+                    if (request === this.poEditRequest) this.poEditError = error.message;
+                } finally {
+                    if (request === this.poEditRequest) this.poEditLoading = false;
+                }
             },
 
             toDateInputValue(dateString) {
@@ -609,6 +615,9 @@
     <link rel="stylesheet" href="{{ asset('css/fruit-calculator.css') }}?v={{ filemtime(public_path('css/fruit-calculator.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sbg-v24.css') }}?v={{ filemtime(public_path('css/sbg-v24.css')) }}">
     <link rel="stylesheet" href="{{ asset('css/sbg-v24-receipt.css') }}?v={{ filemtime(public_path('css/sbg-v24-receipt.css')) }}">
+    @includeIf('components.sbg.theme-head')
+    <link rel="stylesheet" href="{{ asset('css/sbg-v25-po.css') }}?v={{ filemtime(public_path('css/sbg-v25-po.css')) }}">
+    <script src="{{ asset('js/sbg-v25-po.js') }}?v={{ filemtime(public_path('js/sbg-v25-po.js')) }}"></script>
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
 <body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" data-account-id="{{ auth()->id() }}" x-data="dashboardApp" :class="'sbg-page-' + mobilePage + (sidebarCollapsed ? ' sbg-sidebar-collapsed' : '')" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'; if (location.hash === '#master-data') mobilePage = 'admin'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1024px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); mobilePage === 'admin' ? document.getElementById('master-search').focus() : focusPoSearch(); }">
@@ -824,175 +833,7 @@
     <!-- ========================================================= -->
     <!-- MODAL 3: EDIT PO                                          -->
     <!-- ========================================================= -->
-    <div x-show="isEditModalOpen" 
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0"
-        x-transition:enter-end="opacity-100"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100"
-        x-transition:leave-end="opacity-0"
-        class="sbg-modal fixed inset-0 z-50 overflow-y-auto bg-[#0a291e]/60 backdrop-blur-sm flex items-center justify-center p-4"
-        x-cloak>
-
-        <div @click.away="isEditModalOpen = false" class="sbg-modal-panel bg-white w-full max-w-2xl rounded-xl overflow-hidden p-4 sm:p-6 space-y-5 relative max-h-[90vh] overflow-y-auto border border-[#dce1d6]">
-            
-            <div class="sticky top-0 z-10 -mx-4 -mt-4 sm:-mx-6 sm:-mt-6 px-4 sm:px-6 py-4 bg-white/95 backdrop-blur border-b border-[#dce1d6] flex items-center justify-between">
-                <div>
-                    <h3 class="text-lg sm:text-xl font-extrabold text-[#1c3328]">Edit Purchase Order</h3>
-                    <p class="mt-0.5 text-[11px] text-[#687168]" x-text="editPo.po_number || 'Perbarui informasi transaksi.'"></p>
-                </div>
-                <button type="button" @click="isEditModalOpen = false" aria-label="Tutup" class="w-9 h-9 shrink-0 rounded-full bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#687168] flex items-center justify-center text-xl font-bold transition">&times;</button>
-            </div>
-
-            <form :action="'/dashboard/po/' + editPo.id" method="POST" class="space-y-5">
-                @csrf
-                @method('PUT')
-
-                <!-- Kelompok 1: Informasi Transaksi -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6]/80 bg-[#f7f7f0]/60 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">1. Informasi Transaksi</p>
-                    <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-2' : 'md:grid-cols-3' }} gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Tanggal</label>
-                            <input type="date" name="transaction_date" x-model="editPo.transaction_date" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Kategori</label>
-                            <select name="category" x-model="editPo.category" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                                <option value="Karbo">Karbo</option>
-                                <option value="Protein Nabati">Protein Nabati</option>
-                                <option value="Protein Hewani">Protein Hewani</option>
-                                <option value="Sayur">Sayur</option>
-                                <option value="Buah">Buah</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Prioritas</label>
-                            <select name="priority" x-model="editPo.priority" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                                <option value="Normal">Normal</option>
-                                <option value="Tinggi">Tinggi</option>
-                                <option value="Rendah">Rendah</option>
-                            </select>
-                        </div>
-                        @if(auth()->user()->canManageFinancials())
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Penanggung Jawab</label>
-                            <select name="created_by" x-model.number="editPo.created_by" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                                <option value="" disabled>Pilih Penanggung Jawab</option>
-                                @foreach($admins as $adminOption)
-                                    <option value="{{ $adminOption->id }}">{{ $adminOption->name }} — {{ $adminOption->region ?? 'Tanpa Wilayah' }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        @endif
-                    </div>
-                </div>
-
-                <!-- Kelompok 2: Barang & Supplier -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6]/80 bg-[#f7f7f0]/60 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">2. {{ auth()->user()->canManageFinancials() ? 'Barang & Supplier' : 'Informasi Barang' }}</p>
-                    <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-2' : '' }} gap-3 items-end">
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Nama Barang / PO</label>
-                            <input type="text" name="item_name" x-model="editPo.item_name" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                        </div>
-                        @if(auth()->user()->canManageFinancials())
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Supplier</label>
-                            <input type="text" name="supplier_name" x-model="editPo.supplier_name" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
-                        </div>
-                        @endif
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                            <label class="block text-xs font-bold text-emerald-800 mb-1">Qty Gudang SBG</label>
-                            <input type="number" step="any" min="0" name="quantity_sbg" x-model="editPo.quantity_sbg" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(editPo.quantity_sbg || 0) * Number(String(editPo.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
-                        </div>
-                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                            <label class="block text-xs font-bold text-blue-800 mb-1">Qty Gudang B</label>
-                            <input type="number" step="any" min="0" name="quantity_b" x-model="editPo.quantity_b" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                            <p class="mt-1 text-xs text-[#687168]" x-text="'× Harga Maker = ' + formatRupiah(Number(editPo.quantity_b || 0) * Number(String(editPo.maker_price || 0).replaceAll('.', '').replace(',', '.')))"></p>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Satuan</label>
-                            <input type="text" name="unit" x-model="editPo.unit" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Kelompok 3: Detail Harga -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6] bg-[#e9efe6]/40 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">3. Rincian Harga & Margin</p>
-                    <div class="grid grid-cols-1 {{ auth()->user()->canManageFinancials() ? 'md:grid-cols-3' : 'md:grid-cols-2' }} gap-3 items-end">
-                        @if(auth()->user()->canManageFinancials())
-                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                            <label class="block text-xs font-bold text-emerald-800 mb-1">Harga Supplier Gudang SBG</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="supplier_price" x-model="editPo.supplier_price" @input="editPo.supplier_price = formatCurrencyInput($event.target)"
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
-                            </div>
-                        </div>
-                        <div class="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                            <label class="block text-xs font-bold text-blue-800 mb-1">Harga Supplier Gudang B</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="supplier_price_b" x-model="editPo.supplier_price_b" @input="editPo.supplier_price_b = formatCurrencyInput($event.target)"
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white">
-                            </div>
-                        </div>
-                        @endif
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Harga Maker</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="maker_price" x-model="editPo.maker_price" @input="editPo.maker_price = formatCurrencyInput($event.target)"
-                                    @if(auth()->user()->canManageFinancials()) :disabled="!hasMinimumCurrencyDigits(editPo.supplier_price) && !hasMinimumCurrencyDigits(editPo.supplier_price_b)" @endif
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white disabled:bg-[#f7f7f0] disabled:text-[#687168] disabled:cursor-not-allowed">
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-[#435348] mb-1">Laba Mitra / unit</label>
-                            <div class="relative">
-                                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-xs font-bold text-[#687168]">Rp</span>
-                                <input type="text" inputmode="decimal" name="partner_margin" x-model="editPo.partner_margin" @input="editPo.partner_margin = formatCurrencyInput($event.target)"
-                                    :disabled="!hasMinimumCurrencyDigits(editPo.maker_price)"
-                                    class="w-full pl-9 pr-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition bg-white disabled:bg-[#f7f7f0] disabled:text-[#687168] disabled:cursor-not-allowed">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Kelompok 4: Tahapan & Catatan -->
-                <div class="space-y-3 rounded-lg border border-[#dce1d6]/80 bg-[#f7f7f0]/60 p-4 shadow-sm">
-                    <p class="text-xs font-bold text-[#123d2c] uppercase tracking-wide border-b border-[#dce1d6] pb-1">4. Status & Catatan Tambahan</p>
-                    <div>
-                        <label class="block text-xs font-semibold text-[#435348] mb-1">Tahapan Status</label>
-                        <select name="status_stage" x-model="editPo.status_stage" required class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none bg-white transition">
-                            <option value="Cari Supplier">Cari Supplier</option>
-                            <option value="Sortir">Sortir</option>
-                            <option value="Pengiriman">Pengiriman</option>
-                            <option value="Selesai">Selesai</option>
-                            <option value="Retur">Retur</option>
-                            <option value="Kekurangan">Kekurangan</option>
-                            <option value="Perubahan Item">Perubahan Item</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-[#435348] mb-1">Catatan</label>
-                        <textarea name="notes" x-model="editPo.notes" rows="2" class="w-full px-3 py-2 border border-[#dce1d6] rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-[#587547]/20 focus:border-[#587547] focus:outline-none transition"></textarea>
-                    </div>
-                </div>
-
-                <div class="sticky bottom-0 z-10 -mx-4 -mb-4 sm:-mx-6 sm:-mb-6 px-4 sm:px-6 py-4 bg-white/95 backdrop-blur flex flex-col-reverse sm:flex-row sm:justify-end gap-2 border-t border-[#dce1d6]">
-                    <button type="button" @click="isEditModalOpen = false" class="w-full sm:w-auto px-5 py-2.5 bg-[#f7f7f0] hover:bg-[#e9efe6] text-[#435348] font-bold rounded-md text-xs transition">Batal</button>
-                    <button type="submit" class="w-full sm:w-auto px-6 py-2.5 bg-[#123d2c] hover:bg-[#0a291e] text-white font-bold rounded-md text-xs transition shadow-sm">Update PO</button>
-                </div>
-            </form>
-
-        </div>
-    </div>
+    @include('components.sbg.edit-po-modal')
 
     <!-- ========================================================= -->
     <!-- MODAL NOTA DAPUR                                          -->
