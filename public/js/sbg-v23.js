@@ -1,5 +1,6 @@
 /* SBG v2.3: only master-data dialogs and the shared navigation shell. */
 window.sbgV23 = () => ({
+    ...window.sbgNavigation(),
     sidebarCollapsed: innerWidth >= 1024 && innerWidth < 1200,
     masterSearch: '', masterRole: '', masterStatus: '', masterView: 'table',
     v23Errors: {}, v23Error: '', v23Busy: false, v23Saved: false, v23Conflict: null,
@@ -13,6 +14,7 @@ window.sbgV23 = () => ({
         const persist = () => { try { sessionStorage.setItem(key,JSON.stringify(Object.fromEntries(['sidebarCollapsed','masterSearch','masterRole','masterStatus','masterView'].map(k=>[k,this[k]])))); } catch (_) {} };
         for (const field of ['sidebarCollapsed','masterSearch','masterRole','masterStatus','masterView']) this.$watch(field,persist);
         this.$watch('desktopNav', () => { this.navOpen = false; });
+        this.$nextTick(() => this.syncNavigation());
     },
     masterMatches(data) {
         const normalize = text => String(text || '').toLocaleLowerCase('id').replaceAll('_',' ');

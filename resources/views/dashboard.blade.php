@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="{{ asset('js/sbg-navigation.js') }}?v={{ filemtime(public_path('js/sbg-navigation.js')) }}"></script>
     <script src="{{ asset('js/sbg-v23.js') }}?v={{ filemtime(public_path('js/sbg-v23.js')) }}"></script>
     <script>
     function renderVerifiedQr(po) {
@@ -437,7 +438,7 @@
             },
             openFruitTab(tab) {
                 this.activeView = 'fruit'; this.navOpen = false;
-                this.$nextTick(() => document.getElementById('fruit-tab-' + tab)?.click());
+                this.$nextTick(() => this.$dispatch('fruit-navigation-request', { tab }));
             },
             navigateDashboard(page) {
                 this.activeView = 'dashboard'; this.mobilePage = page; this.navOpen = false;
@@ -617,10 +618,11 @@
     <link rel="stylesheet" href="{{ asset('css/sbg-v24-receipt.css') }}?v={{ filemtime(public_path('css/sbg-v24-receipt.css')) }}">
     @includeIf('components.sbg.theme-head')
     <link rel="stylesheet" href="{{ asset('css/sbg-v25-po.css') }}?v={{ filemtime(public_path('css/sbg-v25-po.css')) }}">
+    <link rel="stylesheet" href="{{ asset('css/sbg-navigation.css') }}?v={{ filemtime(public_path('css/sbg-navigation.css')) }}">
     <script src="{{ asset('js/sbg-v25-po.js') }}?v={{ filemtime(public_path('js/sbg-v25-po.js')) }}"></script>
     <script defer src="{{ asset('js/sbg-v2.js') }}?v={{ filemtime(public_path('js/sbg-v2.js')) }}"></script>
 </head>
-<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" data-account-id="{{ auth()->id() }}" x-data="dashboardApp" :class="'sbg-page-' + mobilePage + (sidebarCollapsed ? ' sbg-sidebar-collapsed' : '')" @hashchange.window="activeView = location.hash === '#kalkulator-buah' ? 'fruit' : 'dashboard'; if (location.hash === '#data-po') mobilePage = 'orders'; if (location.hash === '#ringkasan') mobilePage = 'home'; if (location.hash === '#master-data') mobilePage = 'admin'" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1024px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); mobilePage === 'admin' ? document.getElementById('master-search').focus() : focusPoSearch(); }">
+<body class="bg-[#f7f7f0] font-sans text-gray-800 antialiased selection:bg-[#f3a51d] selection:text-[#0a291e]" data-account-id="{{ auth()->id() }}" x-data="dashboardApp" :class="'sbg-page-' + mobilePage + (sidebarCollapsed ? ' sbg-sidebar-collapsed' : '')" @hashchange.window="syncNavigation()" @fruit-navigation-changed.window="syncFruitNavigation($event.detail.tab)" @resize.window.debounce.100ms="wideFilters = window.matchMedia('(min-width: 768px)').matches; desktopNav = window.matchMedia('(min-width: 1024px)').matches" @keydown.window="if (($event.ctrlKey || $event.metaKey) && $event.key.toLowerCase() === 'k') { $event.preventDefault(); mobilePage === 'admin' ? document.getElementById('master-search').focus() : focusPoSearch(); }">
 
     @include('components.sbg.app-navigation')
 

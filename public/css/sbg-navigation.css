@@ -1,0 +1,28 @@
+/* Shared shell layout; account/security form styles stay in v2.5. */
+.sbg-settings-page .sbg-settings-layout{display:block;min-height:calc(100dvh - 80px)}
+.sbg-settings-page .sbg-settings-main{min-width:0;max-width:1440px;margin:auto}
+.sbg-navigation-title{font-weight:700;flex:1}
+.sbg-settings-page .sbg-topbar{position:relative}
+.sbg-settings-page .sbg-topbar>.sbg-account{margin-left:auto}
+.sbg-sidebar{height:100dvh;overflow:visible;display:flex;flex-direction:column}
+.sbg-sidebar>.sbg-brand,.sbg-sidebar>.sbg-nav-caption,.sbg-sidebar-bottom{flex-shrink:0}
+.sbg-sidebar>nav{align-content:start;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;flex:1;scrollbar-width:thin}
+.sbg-sidebar-bottom{margin-top:12px}
+.sbg-sidebar>nav a,.sbg-sidebar>nav>button{min-height:44px}
+.sbg-sidebar .sbg-account-toggle{max-width:100%;min-height:44px}
+.sbg-sidebar .sbg-account-name{min-width:0}
+.sbg-sidebar .sbg-account-chevron{flex-shrink:0}
+.sbg-account-menu.sbg-v24-account-menu{position:absolute;left:var(--sbg-menu-left,8px)!important;top:var(--sbg-menu-top,80px)!important;right:auto!important;bottom:auto!important;width:300px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow-y:auto;overscroll-behavior:contain;z-index:100;animation:none;transform:none}
+.sbg-sidebar a,.sbg-bottom-nav a,.sbg-account-menu a{text-decoration:none}
+.sbg-account-menu.sbg-v24-account-menu>a,.sbg-account-menu.sbg-v24-account-menu>button{min-height:44px}
+@media(min-width:1024px){
+.sbg-sidebar-collapsed .sbg-sidebar .sbg-brand strong,.sbg-sidebar-collapsed .sbg-sidebar .sbg-nav-caption,.sbg-sidebar-collapsed .sbg-sidebar .sbg-v23-nav-label{display:none}
+.sbg-sidebar-collapsed .sbg-sidebar>nav{margin-top:98px}
+.sbg-sidebar-collapsed .sbg-sidebar nav a{justify-content:center;padding:12px}
+.sbg-sidebar-collapsed .sbg-sidebar .sbg-account-name,.sbg-sidebar-collapsed .sbg-sidebar .sbg-account-chevron{display:none!important}
+.sbg-sidebar-collapsed .sbg-sidebar .sbg-account-toggle{padding:2px;background:transparent;justify-content:center;width:44px}
+.sbg-sidebar-collapsed .sbg-sidebar nav a:is(:hover,:focus)>.sbg-v23-nav-tip{display:block;position:fixed;left:76px;top:var(--sbg-tip-top,150px);transform:none;max-width:calc(100vw - 84px)}
+}
+@media(max-width:1023px){.sbg-sidebar{width:min(292px,calc(100vw - 32px));padding-top:22px;padding-bottom:max(16px,env(safe-area-inset-bottom));z-index:90}.sbg-nav-backdrop{z-index:89}.sbg-sidebar .sbg-brand{padding-right:30px}.sbg-settings-page .sbg-settings-main{padding-bottom:100px}}
+@media(max-width:767px){.sbg-settings-page .sbg-topbar{gap:8px}.sbg-settings-page .sbg-mobile-brand{display:none}.sbg-settings-page .sbg-topbar .sbg-account-name{display:none!important}.sbg-navigation-title{font-size:13px}.sbg-settings-page .sbg-settings-header{height:auto;min-height:44px;flex-wrap:wrap;gap:10px}.sbg-settings-page .sbg-settings-identity{display:none}}
+@media(prefers-reduced-motion:reduce){.sbg-sidebar{transition:none}}

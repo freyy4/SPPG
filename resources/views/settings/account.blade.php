@@ -11,14 +11,11 @@
     $statuses = ['profile-updated'=>'Informasi profil berhasil disimpan.','photo-updated'=>'Foto profil berhasil diperbarui.','password-updated'=>'Password berhasil diperbarui.','pin-enabled'=>'PIN keamanan berhasil diaktifkan.','pin-changed'=>'PIN keamanan berhasil diubah.','pin-disabled'=>'PIN keamanan dinonaktifkan.','pin-verified'=>'PIN berhasil diverifikasi.','totp-setup'=>'Pindai kode QR, lalu konfirmasi kode untuk mengaktifkan 2FA.','totp-enabled'=>'Verifikasi dua langkah berhasil diaktifkan. Simpan kode pemulihan Anda.','totp-disabled'=>'Verifikasi dua langkah dinonaktifkan.','recovery-regenerated'=>'Kode pemulihan baru dibuat. Kode sebelumnya tidak berlaku.','sessions-revoked'=>'Sesi lain telah dicabut.'];
 @endphp
 <!DOCTYPE html>
-<html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>Pengaturan Akun — Sentra Buah Garut</title><link rel="icon" href="{{ asset('favicon.svg') }}">@include('components.sbg.theme-head')</head>
-<body class="sbg-settings-page">
+<html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="csrf-token" content="{{ csrf_token() }}"><title>Pengaturan Akun — Sentra Buah Garut</title><link rel="icon" href="{{ asset('favicon.svg') }}">@include('settings.partials.navigation-head')</head>
+<body class="sbg-settings-page" data-account-id="{{ auth()->id() }}" x-data="{ ...sbgV23(), navOpen: false, desktopNav: matchMedia('(min-width: 1024px)').matches, isLogoutModalOpen: false }" :class="sidebarCollapsed ? 'sbg-sidebar-collapsed' : ''" @resize.window.debounce.100ms="desktopNav = matchMedia('(min-width: 1024px)').matches">
+@include('components.sbg.app-navigation', ['settingsNavigation' => true])
 <div class="sbg-settings-layout" data-sbg-settings data-active-tab="{{ $tab }}">
-    <aside class="sbg-settings-sidebar" aria-label="Navigasi aplikasi">
-        <a href="{{ route('dashboard') }}" class="sbg-auth-brand"><img src="{{ asset('favicon.svg') }}" width="42" height="42" alt=""><span><strong>Sentra Buah Garut</strong><small>SISTEM PURCHASE ORDER</small></span></a>
-        <nav><a href="{{ route('dashboard') }}"><span aria-hidden="true">⌂</span> Beranda</a><a href="{{ route('dashboard') }}#data-po"><span aria-hidden="true">▤</span> Purchase Order</a><a href="{{ route('dashboard') }}#kalkulator-buah"><span aria-hidden="true">♧</span> Data Buah</a><a href="{{ route('dashboard') }}#master-data"><span aria-hidden="true">♙</span> Mitra Dapur</a><a href="{{ $accountUrl('account.settings','/settings/account') }}" aria-current="page"><span aria-hidden="true">⚙</span> Pengaturan</a></nav>
-        <div class="sbg-settings-promo"><strong>Buah Segar<br>untuk Dapur Indonesia</strong><p>Bersama petani lokal, untuk masa depan lebih sehat.</p><img src="{{ asset('images/sbg-v25/fruit-support.webp') }}" alt="" width="240" height="140"></div>
-    </aside>
+
     <main class="sbg-settings-main" id="account-content">
         <header class="sbg-settings-header"><a href="{{ route('dashboard') }}">⌂ &nbsp; / &nbsp; Pengaturan</a><div class="sbg-settings-identity"><span class="sbg-avatar-small">@if($user->avatar_path)<img src="{{ $accountUrl('account.avatar','/settings/account/avatar') }}" alt="">@else{{ $initial }}@endif</span><div><strong>{{ $user->name }}</strong><small>{{ $user->region ?: 'Wilayah belum ditetapkan' }}</small></div></div></header>
         <div class="sbg-settings-title"><h1>Pengaturan Akun</h1><p>Kelola informasi profil, akun, dan keamanan Anda dengan mudah dan aman.</p></div>
@@ -63,5 +60,5 @@
         </section>
     </main>
 </div>
-<nav class="sbg-settings-mobile-nav" aria-label="Navigasi mobile"><a href="{{ route('dashboard') }}">⌂ &nbsp; Beranda</a><a href="{{ route('dashboard') }}#data-po">▤ &nbsp; Purchase Order</a><a href="{{ $accountUrl('account.settings','/settings/account') }}" aria-current="page">⚙ &nbsp; Akun</a></nav>
+@include('components.sbg.logout-modal')
 </body></html>

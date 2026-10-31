@@ -3,7 +3,8 @@
 @endphp
 <section id="kalkulator-buah" x-cloak x-show="activeView === 'fruit'"
     x-data="fruitCalculator({ base: @js(route('fruit-calculator.index', [], false)), csrf: @js(csrf_token()), region: @js($fruitDefaultRegion) })"
-    x-init="$watch('activeView', value => { if (value === 'fruit' && !loaded) load(); }); if (activeView === 'fruit') load();"
+    x-init="$watch('tab', value => $dispatch('fruit-navigation-changed', { tab: value })); $watch('activeView', value => { if (value === 'fruit' && !loaded) load(); }); if (activeView === 'fruit') load();"
+    @fruit-navigation-request.window="if (['calculate', 'master', 'archive'].includes($event.detail.tab) && tab !== $event.detail.tab) { tab = $event.detail.tab; if (tab === 'master') $nextTick(() => drawChart()); if (tab === 'archive') loadArchive(1); }"
     @resize.window.debounce.150ms="drawChart()"
     class="fruit-tool sbg-v24-planning mx-auto min-h-screen max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
     <div class="fruit-hero sbg-v24-hero">
